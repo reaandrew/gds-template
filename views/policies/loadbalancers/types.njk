@@ -23,11 +23,17 @@
                     {% if type.type == "NLB" %}{% set nlb = type.count %}{% endif %}
                     {% if type.type == "Classic" %}{% set classic = type.count %}{% endif %}
                 {% endfor %}
-                <tr class="govuk-table__row">
+                <tr class="govuk-table__row"{% if classic > 0 %} style="background-color: #fef2f2;"{% endif %}>
                     <td class="govuk-table__cell">{{ teamData.team }}</td>
                     <td class="govuk-table__cell">{{ alb }}</td>
                     <td class="govuk-table__cell">{{ nlb }}</td>
-                    <td class="govuk-table__cell">{{ classic }}</td>
+                    <td class="govuk-table__cell">
+                        {% if classic > 0 %}
+                            {{ classic }} <span class="govuk-hint govuk-!-font-size-14" style="color: #d73027;">(deprecated)</span>
+                        {% else %}
+                            {{ classic }}
+                        {% endif %}
+                    </td>
                     <td class="govuk-table__cell">{{ alb + nlb + classic }}</td>
                 </tr>
             {% endfor %}
