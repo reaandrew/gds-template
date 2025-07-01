@@ -25,16 +25,10 @@
             </thead>
             <tbody class="govuk-table__body">
                 {% for resourceTypeData in teamData.resourceTypes %}
-                    {% set hasAnyMissing = false %}
-                    {% for tag in resourceTypeData.tags %}
-                        {% if tag.hasMissing %}
-                            {% set hasAnyMissing = true %}
-                        {% endif %}
-                    {% endfor %}
-                    <tr class="govuk-table__row"{% if hasAnyMissing %} style="background-color: #fef2f2;"{% endif %}>
+                    <tr class="govuk-table__row">
                         <td class="govuk-table__cell"><strong>{{ resourceTypeData.resourceType }}</strong></td>
                         {% for tag in resourceTypeData.tags %}
-                            <td class="govuk-table__cell">{{ tag.missingCount }}</td>
+                            <td class="govuk-table__cell"{% if tag.hasMissing %} style="background-color: #fef2f2;"{% endif %}>{{ tag.missingCount }}</td>
                         {% endfor %}
                     </tr>
                 {% endfor %}
