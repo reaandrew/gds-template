@@ -25,8 +25,10 @@
                 {% for tlsVersion in teamData.tlsVersions %}
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">
-                            {% if tlsVersion.version == 'NO CERTS' %}
+                            {% if tlsVersion.isNoCerts %}
                                 <strong>{{ tlsVersion.version }}</strong>
+                            {% elif tlsVersion.isDeprecated %}
+                                <strong class="govuk-tag govuk-tag--red">DEPRECATED</strong> {{ tlsVersion.version }}
                             {% else %}
                                 {{ tlsVersion.version }}
                             {% endif %}

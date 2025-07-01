@@ -288,15 +288,34 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
             }
         }
         
+        // Helper function to check if TLS policy is deprecated
+        const isDeprecatedPolicy = (version) => {
+            return version.startsWith('ELBSecurityPolicy-2015') ||
+                   version.startsWith('ELBSecurityPolicy-2016') ||
+                   version === 'Classic-Default' ||
+                   version.includes('TLS-1-0') ||
+                   version.includes('TLS-1-1');
+        };
+        
         // Format data for view
         const data = [...teamTls.entries()].map(([team, rec]) => {
             const totalWithTLS = [...rec.tlsVersions.values()].reduce((sum, count) => sum + count, 0);
             const noCertsCount = rec.totalLBs - totalWithTLS;
-            const tlsVersions = [...rec.tlsVersions.entries()].map(([version, count]) => ({ version, count }));
+            const tlsVersions = [...rec.tlsVersions.entries()].map(([version, count]) => ({ 
+                version, 
+                count,
+                isDeprecated: isDeprecatedPolicy(version),
+                isNoCerts: false
+            }));
             
             // Add NO CERTS entry if there are load balancers without certificates
             if (noCertsCount > 0) {
-                tlsVersions.push({ version: 'NO CERTS', count: noCertsCount });
+                tlsVersions.push({ 
+                    version: 'NO CERTS', 
+                    count: noCertsCount,
+                    isDeprecated: false,
+                    isNoCerts: true
+                });
             }
             
             return {
