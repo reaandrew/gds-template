@@ -226,19 +226,35 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         await client.connect();
         const db = client.db(dbName);
         
-        // Query listeners and classic ELB collections
+        // Query all load balancer collections
+        const elbV2Col = db.collection("elb_v2");
         const elbV2ListenersCol = db.collection("elb_v2_listeners");
         const elbClassicCol = db.collection("elb_classic");
         
-        const teamTls = new Map(); // team → { tlsVersions: Map<version, count> }
+        const teamTls = new Map(); // team → { tlsVersions: Map<version, count>, totalLBs: count }
         
         const ensureTeam = t => {
             if (!teamTls.has(t))
-                teamTls.set(t, { tlsVersions: new Map() });
+                teamTls.set(t, { tlsVersions: new Map(), totalLBs: 0 });
             return teamTls.get(t);
         };
         
-        // Process ALB/NLB listeners from dedicated collection
+        // First, count ALL load balancers by team
+        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1 } });
+        for await (const doc of elbV2Cursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            rec.totalLBs++;
+        }
+        
+        const elbClassicTotalCursor = elbClassicCol.find({}, { projection: { account_id: 1 } });
+        for await (const doc of elbClassicTotalCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            rec.totalLBs++;
+        }
+        
+        // Then, count load balancers WITH TLS certificates
         const elbV2ListenersCursor = elbV2ListenersCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of elbV2ListenersCursor) {
