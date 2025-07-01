@@ -496,8 +496,13 @@ app.get('/compliance/kms', async (req, res) => {
     }
 });
 
-// ASGs with no instances
-app.get('/compliance/autoscaling', async (req, res) => {
+// ASG Overview routes
+app.get('/compliance/autoscaling', (req, res) => {
+    res.redirect('/compliance/autoscaling/dimensions');
+});
+
+// ASG Dimensions (counts by min/max/desired)
+app.get('/compliance/autoscaling/dimensions', async (req, res) => {
     const client = new MongoClient(uri);
 
     try {
@@ -505,42 +510,87 @@ app.get('/compliance/autoscaling', async (req, res) => {
         const db = client.db(dbName);
         const asgCol = db.collection("autoscaling_groups");
         
-        const emptyAsgs = [];
+        const teamDimensions = new Map(); // team → { dimensions: Map<dimension-key, count> }
+        
+        const ensureTeam = t => {
+            if (!teamDimensions.has(t))
+                teamDimensions.set(t, { dimensions: new Map() });
+            return teamDimensions.get(t);
+        };
+        
+        const asgCursor = asgCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of asgCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration) {
+                const min = doc.Configuration.MinSize || 0;
+                const max = doc.Configuration.MaxSize || 0;
+                const desired = doc.Configuration.DesiredCapacity || 0;
+                const key = `${min}-${max}-${desired}`;
+                rec.dimensions.set(key, (rec.dimensions.get(key) || 0) + 1);
+            }
+        }
+        
+        // Format data
+        const data = [...teamDimensions.entries()].map(([team, rec]) => ({
+            team,
+            dimensions: [...rec.dimensions.entries()].map(([dimensionKey, count]) => {
+                const [min, max, desired] = dimensionKey.split("-");
+                return { min: parseInt(min), max: parseInt(max), desired: parseInt(desired), count };
+            }).sort((a, b) => b.count - a.count)
+        })).filter(t => t.dimensions.length > 0);
+
+        res.render('policies/autoscaling/dimensions.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "Auto Scaling", href: "/compliance/autoscaling" }],
+            policy_title: "Auto Scaling Group Dimensions",
+            menu_items: [
+                { href: "/compliance/autoscaling/dimensions", text: "ASG Dimensions" },
+                { href: "/compliance/autoscaling/empty", text: "Empty ASGs" }
+            ],
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
+// ASGs with no instances
+app.get('/compliance/autoscaling/empty', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        const asgCol = db.collection("autoscaling_groups");
+        
+        const teamCounts = new Map(); // team → count
         
         const asgCursor = asgCol.find(
             { "Configuration.Instances": { $size: 0 } },
-            { projection: { account_id: 1, Configuration: 1 } }
+            { projection: { account_id: 1 } }
         );
         
         for await (const doc of asgCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
-            
-            emptyAsgs.push({
-                team,
-                asgName: doc.Configuration.AutoScalingGroupName,
-                desiredCapacity: doc.Configuration.DesiredCapacity || 0,
-                minSize: doc.Configuration.MinSize || 0,
-                maxSize: doc.Configuration.MaxSize || 0,
-                createdTime: doc.Configuration.CreatedTime
-            });
+            teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
         }
         
-        // Group by team
-        const teamGroups = emptyAsgs.reduce((acc, asg) => {
-            if (!acc[asg.team]) acc[asg.team] = [];
-            acc[asg.team].push(asg);
-            return acc;
-        }, {});
-        
-        const data = Object.entries(teamGroups).map(([team, asgs]) => ({
-            team,
-            asgs,
-            count: asgs.length
-        })).sort((a, b) => b.count - a.count);
+        const data = [...teamCounts.entries()]
+            .map(([team, count]) => ({ team, count }))
+            .sort((a, b) => b.count - a.count);
 
         res.render('policies/autoscaling/empty.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Auto Scaling", href: "/compliance/autoscaling" }],
             policy_title: "Auto Scaling Groups with No Instances",
+            menu_items: [
+                { href: "/compliance/autoscaling/dimensions", text: "ASG Dimensions" },
+                { href: "/compliance/autoscaling/empty", text: "Empty ASGs" }
+            ],
             data
         });
     } catch (err) {

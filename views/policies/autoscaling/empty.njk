@@ -2,34 +2,25 @@
 
 {% block policy_content %}
 <h1 class="govuk-heading-l">{{ policy_title }}</h1>
-<p class="govuk-body">This page shows Auto Scaling Groups with no instances grouped by team.</p>
+<p class="govuk-body">This page shows the count of Auto Scaling Groups with no instances by team.</p>
 
 {% if data %}
-    {% for teamData in data %}
-        <h2 class="govuk-heading-m">{{ teamData.team }} ({{ teamData.count }} empty ASGs)</h2>
-        <table class="govuk-table">
-            <thead class="govuk-table__head">
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th class="govuk-table__header">Team</th>
+                <th class="govuk-table__header">Count of Empty ASGs</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            {% for item in data %}
                 <tr class="govuk-table__row">
-                    <th class="govuk-table__header">ASG Name</th>
-                    <th class="govuk-table__header">Desired</th>
-                    <th class="govuk-table__header">Min</th>
-                    <th class="govuk-table__header">Max</th>
-                    <th class="govuk-table__header">Created</th>
+                    <td class="govuk-table__cell">{{ item.team }}</td>
+                    <td class="govuk-table__cell">{{ item.count }}</td>
                 </tr>
-            </thead>
-            <tbody class="govuk-table__body">
-                {% for asg in teamData.asgs %}
-                    <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">{{ asg.asgName }}</td>
-                        <td class="govuk-table__cell">{{ asg.desiredCapacity }}</td>
-                        <td class="govuk-table__cell">{{ asg.minSize }}</td>
-                        <td class="govuk-table__cell">{{ asg.maxSize }}</td>
-                        <td class="govuk-table__cell">{{ asg.createdTime if asg.createdTime else 'Unknown' }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
 {% else %}
     <p class="govuk-body">No empty Auto Scaling Groups found.</p>
 {% endif %}
