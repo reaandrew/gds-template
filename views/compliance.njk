@@ -1,10 +1,12 @@
 {% extends "template.njk" %}
  
 {% block content %}
-    {% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
-    {{ govukBreadcrumbs({ items: breadcrumbs }) }}
+    <div class="app-width-container">
+        {% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+        {{ govukBreadcrumbs({ items: breadcrumbs }) }}
+    </div>
  
-  <div class="govuk-width-container">
+  <div class="app-width-container">
     <main class="govuk-main-wrapper" id="main-content" role="main">
       <div class="govuk-grid-row">
         <!-- Left-hand Navigation -->
