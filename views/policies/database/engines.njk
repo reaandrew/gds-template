@@ -1,10 +1,19 @@
 {% extends "policies/policy.njk" %}
 {% block policy_content %}
-<h1 class="govuk-heading-l">{{ policy_title }}</h1>
+<h1 class="govuk-heading-l" id="top">{{ policy_title }}</h1>
 <p class="govuk-body">This page shows database engines and versions grouped by team.</p>
 {% if data %}
+    <p class="govuk-body">
+        <strong>Jump to team:</strong>
+        {% for teamData in data %}
+            <a class="govuk-link" href="#team-{{ loop.index }}">{{ teamData.team }}</a>{% if not loop.last %} | {% endif %}
+        {% endfor %}
+    </p>
     {% for teamData in data %}
-        <h2 class="govuk-heading-m">{{ teamData.team }}</h2>
+        <h2 class="govuk-heading-m" id="team-{{ loop.index }}">
+            {{ teamData.team }}
+            <a class="govuk-link govuk-body-s" href="#top" style="float: right; font-weight: normal;">Back to top</a>
+        </h2>
         <table class="govuk-table">
             <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
