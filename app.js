@@ -262,13 +262,15 @@ app.get('/compliance/tagging/teams', async (req, res) => {
 
 app.get('/compliance/tagging/details', async (req, res) => {
     const client = new MongoClient(uri);
-    const { team, resourceType, tag } = req.query;
+    const { team, resourceType, tag, search = '', page = 1 } = req.query;
+    const pageSize = 25;
+    const currentPage = parseInt(page);
 
     try {
         await client.connect();
         const db = client.db(dbName);
 
-        const resources = [];
+        const allResources = [];
 
         const isMissing = v =>
             v === null || v === undefined || (typeof v === "string" && v.trim() === "");
@@ -297,25 +299,69 @@ app.get('/compliance/tagging/details', async (req, res) => {
             }
 
             let isMissingTag = false;
+            let missingReason = '';
             
             if (tag === "BSP") {
                 const hasBillingID = !isMissing(tags["billingid"]);
                 const hasService = !isMissing(tags["service"]);
                 const hasProject = !isMissing(tags["project"]);
                 isMissingTag = !(hasBillingID && (hasService || hasProject));
+                
+                if (isMissingTag) {
+                    if (!hasBillingID) {
+                        missingReason = 'Missing BillingID';
+                    } else {
+                        missingReason = 'Missing Service and Project';
+                    }
+                }
             } else {
                 isMissingTag = isMissing(tags[tag.toLowerCase()]);
+                if (isMissingTag) {
+                    missingReason = `Missing ${tag}`;
+                }
             }
 
             if (isMissingTag) {
-                resources.push({
+                // Extract short name from resource ID
+                let shortName = doc.resource_id;
+                if (shortName.includes('/')) {
+                    shortName = shortName.split('/').pop();
+                } else if (shortName.includes(':')) {
+                    const parts = shortName.split(':');
+                    shortName = parts[parts.length - 1];
+                }
+
+                allResources.push({
                     resourceId: doc.resource_id,
+                    shortName: shortName,
                     resourceType: doc.resource_type,
                     tags: tags,
-                    accountId: doc.account_id
+                    accountId: doc.account_id,
+                    missingReason: missingReason,
+                    relevantTags: tag === "BSP" ? 
+                        { billingid: tags["billingid"], service: tags["service"], project: tags["project"] } :
+                        { [tag.toLowerCase()]: tags[tag.toLowerCase()] }
                 });
             }
         }
+
+        // Apply search filter
+        const filteredResources = search ? 
+            allResources.filter(r => 
+                r.resourceId.toLowerCase().includes(search.toLowerCase()) ||
+                r.shortName.toLowerCase().includes(search.toLowerCase()) ||
+                r.accountId.includes(search)
+            ) : allResources;
+
+        // Sort by short name
+        filteredResources.sort((a, b) => a.shortName.localeCompare(b.shortName));
+
+        // Pagination
+        const totalResults = filteredResources.length;
+        const totalPages = Math.ceil(totalResults / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedResources = filteredResources.slice(startIndex, endIndex);
 
         res.render('policies/tagging/details.njk', {
             breadcrumbs: [...complianceBreadcrumbs, 
@@ -327,7 +373,18 @@ app.get('/compliance/tagging/details', async (req, res) => {
             team,
             resourceType,
             tag,
-            resources,
+            resources: paginatedResources,
+            search,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalResults,
+                pageSize,
+                hasNext: currentPage < totalPages,
+                hasPrev: currentPage > 1,
+                startResult: startIndex + 1,
+                endResult: Math.min(endIndex, totalResults)
+            },
             menu_items: [
                 { href: "/compliance/tagging/teams", text: "Teams Overview" },
                 { href: "/compliance/tagging/services", text: "Services Overview" }
