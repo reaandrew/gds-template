@@ -41,7 +41,9 @@
     
     /* Align header and navigation with custom container width */
     .govuk-header__container,
-    .govuk-service-navigation__container {
+    .govuk-service-navigation__container,
+    .govuk-service-navigation__wrapper,
+    .govuk-service-navigation .govuk-width-container {
       max-width: 1400px;
       margin: 0 auto;
       padding-left: 15px;
@@ -50,7 +52,9 @@
     
     @media (min-width: 40.0625em) {
       .govuk-header__container,
-      .govuk-service-navigation__container {
+      .govuk-service-navigation__container,
+      .govuk-service-navigation__wrapper,
+      .govuk-service-navigation .govuk-width-container {
         padding-left: 30px;
         padding-right: 30px;
       }
