@@ -38,6 +38,21 @@
         width: 25%;
       }
     }
+    
+    /* Fix breadcrumb alignment with custom container */
+    .govuk-breadcrumbs {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding-left: 15px;
+      padding-right: 15px;
+    }
+    
+    @media (min-width: 40.0625em) {
+      .govuk-breadcrumbs {
+        padding-left: 30px;
+        padding-right: 30px;
+      }
+    }
   </style>
 {% endblock %}
  
