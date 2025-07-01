@@ -1,27 +1,37 @@
 {% extends "policies/policy.njk" %}
- 
 {% block policy_content %}
-<h1 class="govuk-heading-l">{{ policy_title }} - Teams Overview</h1>
-<p class="govuk-body">This page shows the number of resources with more than one missing mandatory tag, grouped by team name.</p>
- 
+<h1 class="govuk-heading-l" id="top">{{ policy_title }}</h1>
+<p class="govuk-body">This page shows missing mandatory tag counts for each team. Red highlighting indicates missing tags.</p>
 {% if data %}
-    <table class="govuk-table">
-        <thead class="govuk-table__head">
-            <tr class="govuk-table__row">
-                <th class="govuk-table__header">Team</th>
-                <th class="govuk-table__header">Count of Resources with Missing Tags</th>
-            </tr>
-        </thead>
-        <tbody class="govuk-table__body">
-            {% for item in data %}
+    <p class="govuk-body">
+        <strong>Jump to team:</strong>
+        {% for teamData in data %}
+            <a class="govuk-link" href="#team-{{ loop.index }}">{{ teamData.team }}</a>{% if not loop.last %} | {% endif %}
+        {% endfor %}
+    </p>
+    {% for teamData in data %}
+        <h2 class="govuk-heading-m" id="team-{{ loop.index }}">
+            {{ teamData.team }}
+            <a class="govuk-link govuk-body-s" href="#top" style="float: right; font-weight: normal;">Back to top</a>
+        </h2>
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
                 <tr class="govuk-table__row">
-                    <td class="govuk-table__cell">{{ item.team }}</td>
-                    <td class="govuk-table__cell">{{ item.resourcesCount }}</td>
+                    {% for tag in mandatoryTags %}
+                        <th class="govuk-table__header">{{ tag }}</th>
+                    {% endfor %}
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody class="govuk-table__body">
+                <tr class="govuk-table__row">
+                    {% for tag in teamData.tags %}
+                        <td class="govuk-table__cell"{% if tag.hasMissing %} style="background-color: #fef2f2;"{% endif %}>{{ tag.missingCount }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    {% endfor %}
 {% else %}
-    <p class="govuk-body">No data available for the latest day.</p>
+    <p class="govuk-body">No teams with missing mandatory tags found.</p>
 {% endif %}
 {% endblock %}

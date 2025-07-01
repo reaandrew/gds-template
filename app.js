@@ -154,10 +154,13 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             .sort({ day: -1 });
  
         const mandLower = mandatoryTags.map(t => t.toLowerCase());
-        const teamAgg = new Map();            // team → { resourcesCount, _seen:Set }
+        const teamAgg = new Map();            // team → { tagMissing: Map<tagName, count>, _seen: Set }
         const ensureTeam = t => {
-            if (!teamAgg.has(t))
-                teamAgg.set(t, { resourcesCount: 0, _seen: new Set() });
+            if (!teamAgg.has(t)) {
+                const tagMissing = new Map();
+                mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
+                teamAgg.set(t, { tagMissing, _seen: new Set() });
+            }
             return teamAgg.get(t);
         };
  
@@ -179,23 +182,42 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             const tags = Object.fromEntries(
                 Object.entries(doc.tags || {}).map(([k, v]) => [k.toLowerCase(), v])
             );
-            const hasMissing = mandLower.some(k => isMissing(tags[k]));
-            if (hasMissing) rec.resourcesCount += 1;
+            
+            // Check each mandatory tag and increment missing count
+            mandLower.forEach((tagLower, index) => {
+                if (isMissing(tags[tagLower])) {
+                    const originalTagName = mandatoryTags[index];
+                    rec.tagMissing.set(originalTagName, rec.tagMissing.get(originalTagName) + 1);
+                }
+            });
         }
  
+        // Format data for view
         const data = [...teamAgg.entries()]
-            .filter(([, v]) => v.resourcesCount > 0)
-            .map(([team, v]) => ({ team, resourcesCount: v.resourcesCount }))
-            .sort((a, b) => b.resourcesCount - a.resourcesCount);
+            .map(([team, rec]) => ({
+                team,
+                tags: mandatoryTags.map(tag => ({
+                    tagName: tag,
+                    missingCount: rec.tagMissing.get(tag),
+                    hasMissing: rec.tagMissing.get(tag) > 0
+                }))
+            }))
+            .filter(teamData => teamData.tags.some(tag => tag.hasMissing))
+            .sort((a, b) => {
+                const totalA = a.tags.reduce((sum, tag) => sum + tag.missingCount, 0);
+                const totalB = b.tags.reduce((sum, tag) => sum + tag.missingCount, 0);
+                return totalB - totalA;
+            });
  
         res.render('policies/tagging/teams.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Tagging", href: "/compliance/tagging" }],
-            policy_title: "Tagging (by Team)",
+            policy_title: "Tagging Compliance by Team",
             menu_items: [
                 { href: "/compliance/tagging/teams", text: "Teams Overview" },
                 { href: "/compliance/tagging/services", text: "Services Overview" }
             ],
-            data
+            data,
+            mandatoryTags
         });
     } catch (err) {
         console.error(err);
