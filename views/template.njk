@@ -51,11 +51,24 @@
       padding-right: 15px;
     }
     
-    /* Nuclear option: Override ALL GOV.UK containers */
-    .govuk-header,
-    .govuk-header > *,
-    .govuk-header div,
+    /* Allow header backgrounds to be full width but constrain content */
+    .govuk-header {
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    .govuk-service-navigation {
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    /* But constrain the content containers inside */
     .govuk-header__container,
+    .govuk-header .govuk-width-container,
+    .govuk-service-navigation__container,
+    .govuk-service-navigation .govuk-width-container,
     .govuk-width-container {
       max-width: 1400px !important;
       margin: 0 auto !important;
