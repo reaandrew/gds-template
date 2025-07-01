@@ -154,14 +154,21 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             .sort({ day: -1 });
  
         const mandLower = mandatoryTags.map(t => t.toLowerCase());
-        const teamAgg = new Map();            // team → { tagMissing: Map<tagName, count>, _seen: Set }
+        const teamAgg = new Map();            // team → { resourceTypes: Map<resourceType, tagMissing: Map<tagName, count>>, _seen: Set }
         const ensureTeam = t => {
             if (!teamAgg.has(t)) {
-                const tagMissing = new Map();
-                mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
-                teamAgg.set(t, { tagMissing, _seen: new Set() });
+                teamAgg.set(t, { resourceTypes: new Map(), _seen: new Set() });
             }
             return teamAgg.get(t);
+        };
+        
+        const ensureResourceType = (teamRec, resourceType) => {
+            if (!teamRec.resourceTypes.has(resourceType)) {
+                const tagMissing = new Map();
+                mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
+                teamRec.resourceTypes.set(resourceType, tagMissing);
+            }
+            return teamRec.resourceTypes.get(resourceType);
         };
  
         const isMissing = v =>
@@ -176,8 +183,11 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             const rec = ensureTeam(team);
  
             // global dedupe – if we’ve seen this resource already, skip it
-            if (rec._seen.has(doc.resource_id)) continue;
-            rec._seen.add(doc.resource_id);
+            if (teamRec._seen.has(doc.resource_id)) continue;
+            teamRec._seen.add(doc.resource_id);
+
+            const resourceType = doc.resource_type || "unknown";
+            const tagMissing = ensureResourceType(teamRec, resourceType);
  
             // Convert Tags array to object for easier lookup
             const tags = {};
@@ -193,25 +203,28 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             mandLower.forEach((tagLower, index) => {
                 if (isMissing(tags[tagLower])) {
                     const originalTagName = mandatoryTags[index];
-                    rec.tagMissing.set(originalTagName, rec.tagMissing.get(originalTagName) + 1);
+                    tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
                 }
             });
         }
  
         // Format data for view
         const data = [...teamAgg.entries()]
-            .map(([team, rec]) => ({
+            .map(([team, teamRec]) => ({
                 team,
-                tags: mandatoryTags.map(tag => ({
-                    tagName: tag,
-                    missingCount: rec.tagMissing.get(tag),
-                    hasMissing: rec.tagMissing.get(tag) > 0
+                resourceTypes: [...teamRec.resourceTypes.entries()].map(([resourceType, tagMissing]) => ({
+                    resourceType,
+                    tags: mandatoryTags.map(tag => ({
+                        tagName: tag,
+                        missingCount: tagMissing.get(tag),
+                        hasMissing: tagMissing.get(tag) > 0
+                    }))
                 }))
             }))
-            .filter(teamData => teamData.tags.some(tag => tag.hasMissing))
+            .filter(teamData => teamData.resourceTypes.some(rt => rt.tags.some(tag => tag.hasMissing)))
             .sort((a, b) => {
-                const totalA = a.tags.reduce((sum, tag) => sum + tag.missingCount, 0);
-                const totalB = b.tags.reduce((sum, tag) => sum + tag.missingCount, 0);
+                const totalA = a.resourceTypes.reduce((sum, rt) => sum + rt.tags.reduce((tagSum, tag) => tagSum + tag.missingCount, 0), 0);
+                const totalB = b.resourceTypes.reduce((sum, rt) => sum + rt.tags.reduce((tagSum, tag) => tagSum + tag.missingCount, 0), 0);
                 return totalB - totalA;
             });
  
