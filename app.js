@@ -154,21 +154,14 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             .sort({ day: -1 });
  
         const mandLower = mandatoryTags.map(t => t.toLowerCase());
-        const teamAgg = new Map();            // team → { resourceTypes: Map<resourceType, tagMissing: Map<tagName, count>>, _seen: Set }
+        const teamAgg = new Map();            // team → { tagMissing: Map<tagName, count>, _seen: Set }
         const ensureTeam = t => {
             if (!teamAgg.has(t)) {
-                teamAgg.set(t, { resourceTypes: new Map(), _seen: new Set() });
-            }
-            return teamAgg.get(t);
-        };
-        
-        const ensureResourceType = (teamRec, resourceType) => {
-            if (!teamRec.resourceTypes.has(resourceType)) {
                 const tagMissing = new Map();
                 mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
-                teamRec.resourceTypes.set(resourceType, tagMissing);
+                teamAgg.set(t, { tagMissing, _seen: new Set() });
             }
-            return teamRec.resourceTypes.get(resourceType);
+            return teamAgg.get(t);
         };
  
         const isMissing = v =>
@@ -200,7 +193,7 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             mandLower.forEach((tagLower, index) => {
                 if (isMissing(tags[tagLower])) {
                     const originalTagName = mandatoryTags[index];
-                    tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
+                    rec.tagMissing.set(originalTagName, rec.tagMissing.get(originalTagName) + 1);
                 }
             });
         }
