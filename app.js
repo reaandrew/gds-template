@@ -289,10 +289,22 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         }
         
         // Format data for view
-        const data = [...teamTls.entries()].map(([team, rec]) => ({
-            team,
-            tlsVersions: [...rec.tlsVersions.entries()].map(([version, count]) => ({ version, count }))
-        })).filter(t => t.tlsVersions.length > 0);
+        const data = [...teamTls.entries()].map(([team, rec]) => {
+            const totalWithTLS = [...rec.tlsVersions.values()].reduce((sum, count) => sum + count, 0);
+            const noCertsCount = rec.totalLBs - totalWithTLS;
+            const tlsVersions = [...rec.tlsVersions.entries()].map(([version, count]) => ({ version, count }));
+            
+            // Add NO CERTS entry if there are load balancers without certificates
+            if (noCertsCount > 0) {
+                tlsVersions.push({ version: 'NO CERTS', count: noCertsCount });
+            }
+            
+            return {
+                team,
+                tlsVersions,
+                totalLBs: rec.totalLBs
+            };
+        }).filter(t => t.totalLBs > 0);
         res.render('policies/loadbalancers/tls.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
             policy_title: "Load Balancer TLS Configurations",

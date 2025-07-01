@@ -15,7 +15,13 @@
             <tbody class="govuk-table__body">
                 {% for tlsVersion in teamData.tlsVersions %}
                     <tr class="govuk-table__row">
-                        <td class="govuk-table__cell">{{ tlsVersion.version }}</td>
+                        <td class="govuk-table__cell">
+                            {% if tlsVersion.version == 'NO CERTS' %}
+                                <strong>{{ tlsVersion.version }}</strong>
+                            {% else %}
+                                {{ tlsVersion.version }}
+                            {% endif %}
+                        </td>
                         <td class="govuk-table__cell">{{ tlsVersion.count }}</td>
                     </tr>
                 {% endfor %}
