@@ -28,7 +28,7 @@ const policiesBreadcrumbs = [
 // Configuration for Markdown directory
 const markdownRoot = path.join(__dirname, 'markdown'); // Adjust the path as necessary
  
-const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN_Application", "Project", "Service", "BillingID"];
+const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN_Application", "BSP"];
  
 const mappings = yaml.parse(fs.readFileSync(path.join(__dirname, 'config/account_mappings.yaml'), 'utf8'));
 const accountIdToTeam = Object.fromEntries(mappings.map(mapping => [mapping.OwnerId, mapping.Team]));
@@ -201,9 +201,23 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             
             // Check each mandatory tag and increment missing count
             mandLower.forEach((tagLower, index) => {
-                if (isMissing(tags[tagLower])) {
-                    const originalTagName = mandatoryTags[index];
-                    tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
+                const originalTagName = mandatoryTags[index];
+                
+                if (originalTagName === "BSP") {
+                    // BSP validation: needs BillingID AND (Service OR Project)
+                    const hasBillingID = !isMissing(tags["billingid"]);
+                    const hasService = !isMissing(tags["service"]);
+                    const hasProject = !isMissing(tags["project"]);
+                    
+                    const bspValid = hasBillingID && (hasService || hasProject);
+                    if (!bspValid) {
+                        tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
+                    }
+                } else {
+                    // Regular tag validation
+                    if (isMissing(tags[tagLower])) {
+                        tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
+                    }
                 }
             });
         }
