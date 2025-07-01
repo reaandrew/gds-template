@@ -797,6 +797,9 @@ app.get('/compliance/database/details', async (req, res) => {
         
         const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
 
+        console.log(`Database details: team=${team}, engine=${engine}, version=${version}`);
+        console.log(`Latest date: ${latestYear}-${latestMonth}-${latestDay}`);
+
         const allResources = [];
 
         // Check RDS instances
@@ -806,24 +809,29 @@ app.get('/compliance/database/details', async (req, res) => {
                 month: latestMonth, 
                 day: latestDay
             }, { 
-                projection: { account_id: 1, resource_id: 1, "Configuration.Engine": 1, "Configuration.EngineVersion": 1, "Configuration.DBInstanceIdentifier": 1 } 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
             });
             
             for await (const doc of rdsCursor) {
                 const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
                 if (docTeam !== team) continue;
 
-                const docEngine = doc.Configuration?.Engine || "Unknown";
-                const docVersion = doc.Configuration?.EngineVersion || "Unknown";
-                
-                if (docEngine === engine && docVersion === version) {
-                    allResources.push({
-                        resourceId: doc.resource_id,
-                        shortName: doc.Configuration?.DBInstanceIdentifier || doc.resource_id,
-                        engine: docEngine,
-                        version: docVersion,
-                        accountId: doc.account_id
-                    });
+                if (doc.Configuration) {
+                    const docEngine = doc.Configuration.Engine || "Unknown";
+                    const docVersion = doc.Configuration.EngineVersion || "Unknown";
+                    
+                    console.log(`Found RDS: team=${docTeam}, engine=${docEngine}, version=${docVersion}`);
+                    
+                    if (docEngine === engine && docVersion === version) {
+                        console.log(`Match found for RDS: ${doc.Configuration.DBInstanceIdentifier}`);
+                        allResources.push({
+                            resourceId: doc.resource_id,
+                            shortName: doc.Configuration.DBInstanceIdentifier || doc.resource_id,
+                            engine: docEngine,
+                            version: docVersion,
+                            accountId: doc.account_id
+                        });
+                    }
                 }
             }
         }
@@ -835,23 +843,25 @@ app.get('/compliance/database/details', async (req, res) => {
                 month: latestMonth, 
                 day: latestDay
             }, { 
-                projection: { account_id: 1, resource_id: 1, "Configuration.ClusterVersion": 1, "Configuration.ClusterIdentifier": 1 } 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
             });
             
             for await (const doc of redshiftCursor) {
                 const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
                 if (docTeam !== team) continue;
 
-                const docVersion = doc.Configuration?.ClusterVersion || "Unknown";
-                
-                if (docVersion === version) {
-                    allResources.push({
-                        resourceId: doc.resource_id,
-                        shortName: doc.Configuration?.ClusterIdentifier || doc.resource_id,
-                        engine: "redshift",
-                        version: docVersion,
-                        accountId: doc.account_id
-                    });
+                if (doc.Configuration) {
+                    const docVersion = doc.Configuration.ClusterVersion || "Unknown";
+                    
+                    if (docVersion === version) {
+                        allResources.push({
+                            resourceId: doc.resource_id,
+                            shortName: doc.Configuration.ClusterIdentifier || doc.resource_id,
+                            engine: "redshift",
+                            version: docVersion,
+                            accountId: doc.account_id
+                        });
+                    }
                 }
             }
         }
