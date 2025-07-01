@@ -1,0 +1,47 @@
+{% extends "govuk/template.njk" %}
+ 
+{% from "govuk/components/service-navigation/macro.njk" import govukServiceNavigation %}
+{% from "govuk/components/header/macro.njk" import govukHeader %}
+ 
+{% block head %}
+  <link rel="stylesheet" href="/stylesheets/govuk-frontend.min.css">
+{% endblock %}
+ 
+{% block header %}
+{% from "govuk/components/header/macro.njk" import govukHeader %}
+{% from "govuk/components/service-navigation/macro.njk" import govukServiceNavigation %}
+ 
+{{ govukHeader({
+  classes: "govuk-header--full-width-border"
+}) }}
+{{ govukServiceNavigation({
+  serviceName: "Platform Policies and Standards",
+  serviceUrl: "#",
+  navigation: [
+    {
+      href: "#",
+      text: "Compliance Reports",
+      active: true
+    },
+    {
+      href: "#",
+      text: "Policies"
+    }
+  ]
+}) }}
+ 
+{% endblock %}
+ 
+ 
+{% block content %}
+  <h1 class="govuk-heading-xl">Default page template</h1>
+{% endblock %}
+ 
+{% block bodyEnd %}
+  {# Run JavaScript at end of the <body>, to avoid blocking the initial render. #}
+  <script type="module" src="/javascripts/govuk-frontend.min.js"></script>
+  <script type="module">
+    import { initAll } from '/javascripts/govuk-frontend.min.js'
+    initAll()
+  </script>
+{% endblock %}
