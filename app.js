@@ -822,7 +822,13 @@ app.get('/compliance/database/details', async (req, res) => {
                     
                     console.log(`Found RDS: team=${docTeam}, engine=${docEngine}, version=${docVersion}`);
                     
-                    if (docEngine === engine && docVersion === version) {
+                    // Reconstruct the key as it's stored in the main route
+                    const reconstructedKey = `${docEngine}-${docVersion}`;
+                    const expectedKey = `${engine}-${version}`;
+                    
+                    console.log(`Comparing: "${reconstructedKey}" vs "${expectedKey}"`);
+                    
+                    if (reconstructedKey === expectedKey) {
                         console.log(`Match found for RDS: ${doc.Configuration.DBInstanceIdentifier}`);
                         allResources.push({
                             resourceId: doc.resource_id,
