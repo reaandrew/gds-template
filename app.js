@@ -30,6 +30,9 @@ const markdownRoot = path.join(__dirname, 'markdown'); // Adjust the path as nec
  
 const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN_Application"];
  
+const mappings = yaml.parse(fs.readFileSync(path.join(__dirname, 'config/account_mappings.yaml'), 'utf8'));
+const accountIdToTeam = Object.fromEntries(mappings.map(mapping => [mapping.OwnerId, mapping.Team]));
+
 // Load and parse the YAML file
  
 // Configure Nunjucks
@@ -76,6 +79,8 @@ app.get('/compliance', (req, res) => {
                 { text: "Tagging", href: "/compliance/tagging" },
                 { text: "Load Balancers", href: "/compliance/loadbalancers" },
                 { text: "Database", href: "/compliance/database" },
+                { text: "KMS Keys", href: "/compliance/kms" },
+                { text: "Auto Scaling", href: "/compliance/autoscaling" },
                 { text: "Decommissioning", href: "/compliance/decommissioning" },
                 { text: "Containers", href: "/compliance/containers" },
                 { text: "Monitoring and Alerting", href: "/compliance/monitoring" },
@@ -212,6 +217,340 @@ app.get('/compliance/tagging/services', (req, res) => {
     });
 });
  
+// Load Balancer TLS Configurations
+app.get('/compliance/loadbalancers', (req, res) => {
+    res.redirect('/compliance/loadbalancers/tls');
+});
+
+app.get('/compliance/loadbalancers/tls', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        
+        // Query both ELB collections
+        const elbV2Col = db.collection("elb_v2");
+        const elbClassicCol = db.collection("elb_classic");
+        
+        const teamTls = new Map(); // team → { tlsVersions: Map<version, count> }
+        
+        const ensureTeam = t => {
+            if (!teamTls.has(t))
+                teamTls.set(t, { tlsVersions: new Map() });
+            return teamTls.get(t);
+        };
+        
+        // Process ALB/NLB listeners
+        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of elbV2Cursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration?.Listeners) {
+                for (const listener of doc.Configuration.Listeners) {
+                    if (listener.Protocol === "HTTPS" || listener.Protocol === "TLS") {
+                        const policy = listener.SslPolicy || "Unknown";
+                        rec.tlsVersions.set(policy, (rec.tlsVersions.get(policy) || 0) + 1);
+                    }
+                }
+            }
+        }
+        
+        // Process Classic ELB listeners
+        const elbClassicCursor = elbClassicCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of elbClassicCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration?.ListenerDescriptions) {
+                for (const listenerDesc of doc.Configuration.ListenerDescriptions) {
+                    const listener = listenerDesc.Listener;
+                    if (listener?.Protocol === "HTTPS" || listener?.Protocol === "SSL") {
+                        const policy = listenerDesc.PolicyNames?.[0] || "Classic-Default";
+                        rec.tlsVersions.set(policy, (rec.tlsVersions.get(policy) || 0) + 1);
+                    }
+                }
+            }
+        }
+        
+        // Format data for view
+        const data = [...teamTls.entries()].map(([team, rec]) => ({
+            team,
+            tlsVersions: [...rec.tlsVersions.entries()].map(([version, count]) => ({ version, count }))
+        })).filter(t => t.tlsVersions.length > 0);
+
+        res.render('policies/loadbalancers/tls.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
+            policy_title: "Load Balancer TLS Configurations",
+            menu_items: [
+                { href: "/compliance/loadbalancers/tls", text: "TLS Configurations" },
+                { href: "/compliance/loadbalancers/types", text: "Load Balancer Types" }
+            ],
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
+// Load Balancer Types Count
+app.get('/compliance/loadbalancers/types', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        
+        const elbV2Col = db.collection("elb_v2");
+        const elbClassicCol = db.collection("elb_classic");
+        
+        const teamTypes = new Map(); // team → { types: Map<type, count> }
+        
+        const ensureTeam = t => {
+            if (!teamTypes.has(t))
+                teamTypes.set(t, { types: new Map() });
+            return teamTypes.get(t);
+        };
+        
+        // Count ALB/NLB from elb_v2
+        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of elbV2Cursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            const type = doc.Configuration?.Type || "Unknown";
+            rec.types.set(type, (rec.types.get(type) || 0) + 1);
+        }
+        
+        // Count Classic ELBs
+        const elbClassicCursor = elbClassicCol.find({}, { projection: { account_id: 1 } });
+        
+        for await (const doc of elbClassicCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            rec.types.set("classic", (rec.types.get("classic") || 0) + 1);
+        }
+        
+        // Format data
+        const data = [...teamTypes.entries()].map(([team, rec]) => ({
+            team,
+            types: [...rec.types.entries()].map(([type, count]) => ({ 
+                type: type === "application" ? "ALB" : type === "network" ? "NLB" : type === "classic" ? "Classic" : type,
+                count 
+            }))
+        }));
+
+        res.render('policies/loadbalancers/types.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
+            policy_title: "Load Balancer Types by Team",
+            menu_items: [
+                { href: "/compliance/loadbalancers/tls", text: "TLS Configurations" },
+                { href: "/compliance/loadbalancers/types", text: "Load Balancer Types" }
+            ],
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
+// Database Engines and Versions
+app.get('/compliance/database', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        
+        const rdsCol = db.collection("rds");
+        const redshiftCol = db.collection("redshift_clusters");
+        
+        const teamDatabases = new Map(); // team → { engines: Map<engine-version, count> }
+        
+        const ensureTeam = t => {
+            if (!teamDatabases.has(t))
+                teamDatabases.set(t, { engines: new Map() });
+            return teamDatabases.get(t);
+        };
+        
+        // Process RDS instances
+        const rdsCursor = rdsCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of rdsCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration) {
+                const engine = doc.Configuration.Engine || "Unknown";
+                const version = doc.Configuration.EngineVersion || "Unknown";
+                const key = `${engine}-${version}`;
+                rec.engines.set(key, (rec.engines.get(key) || 0) + 1);
+            }
+        }
+        
+        // Process Redshift clusters
+        const redshiftCursor = redshiftCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of redshiftCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration) {
+                const version = doc.Configuration.ClusterVersion || "Unknown";
+                const key = `redshift-${version}`;
+                rec.engines.set(key, (rec.engines.get(key) || 0) + 1);
+            }
+        }
+        
+        // Format data
+        const data = [...teamDatabases.entries()].map(([team, rec]) => ({
+            team,
+            engines: [...rec.engines.entries()].map(([engineVersion, count]) => {
+                const [engine, ...versionParts] = engineVersion.split("-");
+                return { engine, version: versionParts.join("-"), count };
+            })
+        })).filter(t => t.engines.length > 0);
+
+        res.render('policies/database/engines.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "Database", href: "/compliance/database" }],
+            policy_title: "Database Engines and Versions",
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
+// KMS Key Ages
+app.get('/compliance/kms', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        const kmsCol = db.collection("kms_keys");
+        
+        const teamKeyAges = new Map(); // team → { ageBuckets: Map<bucket, count> }
+        
+        const ensureTeam = t => {
+            if (!teamKeyAges.has(t))
+                teamKeyAges.set(t, { ageBuckets: new Map() });
+            return teamKeyAges.get(t);
+        };
+        
+        // Define age buckets
+        const getAgeBucket = (creationDate) => {
+            if (!creationDate) return "Unknown";
+            const ageInDays = (Date.now() - new Date(creationDate).getTime()) / (1000 * 60 * 60 * 24);
+            if (ageInDays < 30) return "0-30 days";
+            if (ageInDays < 90) return "30-90 days";
+            if (ageInDays < 180) return "90-180 days";
+            if (ageInDays < 365) return "180-365 days";
+            if (ageInDays < 730) return "1-2 years";
+            return "2+ years";
+        };
+        
+        const kmsCursor = kmsCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        
+        for await (const doc of kmsCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            const rec = ensureTeam(team);
+            
+            if (doc.Configuration?.CreationDate) {
+                const bucket = getAgeBucket(doc.Configuration.CreationDate);
+                rec.ageBuckets.set(bucket, (rec.ageBuckets.get(bucket) || 0) + 1);
+            }
+        }
+        
+        // Format data with ordered buckets
+        const bucketOrder = ["0-30 days", "30-90 days", "90-180 days", "180-365 days", "1-2 years", "2+ years", "Unknown"];
+        const data = [...teamKeyAges.entries()].map(([team, rec]) => ({
+            team,
+            ageBuckets: bucketOrder
+                .filter(bucket => rec.ageBuckets.has(bucket))
+                .map(bucket => ({ bucket, count: rec.ageBuckets.get(bucket) }))
+        })).filter(t => t.ageBuckets.length > 0);
+
+        res.render('policies/kms/ages.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "KMS Keys", href: "/compliance/kms" }],
+            policy_title: "KMS Key Ages",
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
+// ASGs with no instances
+app.get('/compliance/autoscaling', async (req, res) => {
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        const asgCol = db.collection("autoscaling_groups");
+        
+        const emptyAsgs = [];
+        
+        const asgCursor = asgCol.find(
+            { "Configuration.Instances": { $size: 0 } },
+            { projection: { account_id: 1, Configuration: 1 } }
+        );
+        
+        for await (const doc of asgCursor) {
+            const team = accountIdToTeam[doc.account_id] || "Unknown";
+            
+            emptyAsgs.push({
+                team,
+                asgName: doc.Configuration.AutoScalingGroupName,
+                desiredCapacity: doc.Configuration.DesiredCapacity || 0,
+                minSize: doc.Configuration.MinSize || 0,
+                maxSize: doc.Configuration.MaxSize || 0,
+                createdTime: doc.Configuration.CreatedTime
+            });
+        }
+        
+        // Group by team
+        const teamGroups = emptyAsgs.reduce((acc, asg) => {
+            if (!acc[asg.team]) acc[asg.team] = [];
+            acc[asg.team].push(asg);
+            return acc;
+        }, {});
+        
+        const data = Object.entries(teamGroups).map(([team, asgs]) => ({
+            team,
+            asgs,
+            count: asgs.length
+        })).sort((a, b) => b.count - a.count);
+
+        res.render('policies/autoscaling/empty.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, { text: "Auto Scaling", href: "/compliance/autoscaling" }],
+            policy_title: "Auto Scaling Groups with No Instances",
+            data
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
 app.listen(3000, () => {
     console.log('Server is running on http://localhost:3000');
 });
