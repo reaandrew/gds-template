@@ -797,9 +797,6 @@ app.get('/compliance/database/details', async (req, res) => {
         
         const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
 
-        console.log(`Database details: team=${team}, engine=${engine}, version=${version}`);
-        console.log(`Latest date: ${latestYear}-${latestMonth}-${latestDay}`);
-
         const allResources = [];
 
         // Check RDS instances
@@ -820,22 +817,29 @@ app.get('/compliance/database/details', async (req, res) => {
                     const docEngine = doc.Configuration.Engine || "Unknown";
                     const docVersion = doc.Configuration.EngineVersion || "Unknown";
                     
-                    console.log(`Found RDS: team=${docTeam}, engine=${docEngine}, version=${docVersion}`);
-                    
                     // Reconstruct the key as it's stored in the main route
                     const reconstructedKey = `${docEngine}-${docVersion}`;
                     const expectedKey = `${engine}-${version}`;
                     
-                    console.log(`Comparing: "${reconstructedKey}" vs "${expectedKey}"`);
-                    
                     if (reconstructedKey === expectedKey) {
-                        console.log(`Match found for RDS: ${doc.Configuration.DBInstanceIdentifier}`);
                         allResources.push({
                             resourceId: doc.resource_id,
                             shortName: doc.Configuration.DBInstanceIdentifier || doc.resource_id,
                             engine: docEngine,
                             version: docVersion,
-                            accountId: doc.account_id
+                            accountId: doc.account_id,
+                            details: {
+                                instanceClass: doc.Configuration.DBInstanceClass,
+                                status: doc.Configuration.DBInstanceStatus,
+                                allocatedStorage: doc.Configuration.AllocatedStorage,
+                                storageType: doc.Configuration.StorageType,
+                                multiAZ: doc.Configuration.MultiAZ,
+                                publiclyAccessible: doc.Configuration.PubliclyAccessible,
+                                storageEncrypted: doc.Configuration.StorageEncrypted,
+                                availabilityZone: doc.Configuration.AvailabilityZone,
+                                endpoint: doc.Configuration.Endpoint?.Address,
+                                port: doc.Configuration.Endpoint?.Port
+                            }
                         });
                     }
                 }
@@ -865,7 +869,18 @@ app.get('/compliance/database/details', async (req, res) => {
                             shortName: doc.Configuration.ClusterIdentifier || doc.resource_id,
                             engine: "redshift",
                             version: docVersion,
-                            accountId: doc.account_id
+                            accountId: doc.account_id,
+                            details: {
+                                nodeType: doc.Configuration.NodeType,
+                                status: doc.Configuration.ClusterStatus,
+                                numberOfNodes: doc.Configuration.NumberOfNodes,
+                                publiclyAccessible: doc.Configuration.PubliclyAccessible,
+                                encrypted: doc.Configuration.Encrypted,
+                                availabilityZone: doc.Configuration.AvailabilityZone,
+                                endpoint: doc.Configuration.Endpoint?.Address,
+                                port: doc.Configuration.Endpoint?.Port,
+                                totalStorageGB: doc.Configuration.TotalStorageCapacityInMegaBytes ? Math.round(doc.Configuration.TotalStorageCapacityInMegaBytes / 1024) : null
+                            }
                         });
                     }
                 }

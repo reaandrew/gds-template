@@ -78,6 +78,98 @@
                                                 <td class="govuk-table__cell govuk-!-font-size-14"><strong>Version</strong></td>
                                                 <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.version }}</td>
                                             </tr>
+                                            {% if resource.details %}
+                                                {% if resource.engine == "redshift" %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Node Type</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.nodeType or "N/A" }}</td>
+                                                    </tr>
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Number of Nodes</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.numberOfNodes or "N/A" }}</td>
+                                                    </tr>
+                                                    {% if resource.details.totalStorageGB %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Storage</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.totalStorageGB }} GB</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Instance Class</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.instanceClass or "N/A" }}</td>
+                                                    </tr>
+                                                    {% if resource.details.allocatedStorage %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Storage</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.allocatedStorage }} GB ({{ resource.details.storageType or "unknown" }})</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                    {% if resource.details.multiAZ is not none %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>Multi-AZ</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">
+                                                            {% if resource.details.multiAZ %}
+                                                                <span class="govuk-tag govuk-tag--green">Yes</span>
+                                                            {% else %}
+                                                                <span class="govuk-tag govuk-tag--grey">No</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endif %}
+                                                
+                                                <tr class="govuk-table__row">
+                                                    <td class="govuk-table__cell govuk-!-font-size-14"><strong>Status</strong></td>
+                                                    <td class="govuk-table__cell govuk-!-font-size-14">
+                                                        {% if resource.details.status == "available" or resource.details.status == "running" %}
+                                                            <span class="govuk-tag govuk-tag--green">{{ resource.details.status or "N/A" }}</span>
+                                                        {% else %}
+                                                            <span class="govuk-tag govuk-tag--yellow">{{ resource.details.status or "N/A" }}</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                
+                                                {% if resource.details.publiclyAccessible is not none %}
+                                                <tr class="govuk-table__row">
+                                                    <td class="govuk-table__cell govuk-!-font-size-14"><strong>Public Access</strong></td>
+                                                    <td class="govuk-table__cell govuk-!-font-size-14">
+                                                        {% if resource.details.publiclyAccessible %}
+                                                            <span class="govuk-tag govuk-tag--red">Public</span>
+                                                        {% else %}
+                                                            <span class="govuk-tag govuk-tag--green">Private</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endif %}
+                                                
+                                                {% if resource.details.encrypted is not none %}
+                                                <tr class="govuk-table__row">
+                                                    <td class="govuk-table__cell govuk-!-font-size-14"><strong>Encryption</strong></td>
+                                                    <td class="govuk-table__cell govuk-!-font-size-14">
+                                                        {% if resource.details.encrypted or resource.details.storageEncrypted %}
+                                                            <span class="govuk-tag govuk-tag--green">Encrypted</span>
+                                                        {% else %}
+                                                            <span class="govuk-tag govuk-tag--red">Not Encrypted</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endif %}
+                                                
+                                                {% if resource.details.endpoint %}
+                                                <tr class="govuk-table__row">
+                                                    <td class="govuk-table__cell govuk-!-font-size-14"><strong>Endpoint</strong></td>
+                                                    <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.endpoint }}:{{ resource.details.port or "N/A" }}</td>
+                                                </tr>
+                                                {% endif %}
+                                                
+                                                {% if resource.details.availabilityZone %}
+                                                <tr class="govuk-table__row">
+                                                    <td class="govuk-table__cell govuk-!-font-size-14"><strong>Availability Zone</strong></td>
+                                                    <td class="govuk-table__cell govuk-!-font-size-14">{{ resource.details.availabilityZone }}</td>
+                                                </tr>
+                                                {% endif %}
+                                            {% endif %}
                                         </tbody>
                                     </table>
                                 </div>
