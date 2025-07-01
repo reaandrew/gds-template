@@ -33,7 +33,13 @@
                                 {{ tlsVersion.version }}
                             {% endif %}
                         </td>
-                        <td class="govuk-table__cell">{{ tlsVersion.count }}</td>
+                        <td class="govuk-table__cell">
+                            {% if tlsVersion.count > 0 %}
+                                <a href="/compliance/loadbalancers/details?team={{ teamData.team | urlencode }}&tlsVersion={{ tlsVersion.version | urlencode }}" class="govuk-link">{{ tlsVersion.count }}</a>
+                            {% else %}
+                                {{ tlsVersion.count }}
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>

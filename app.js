@@ -599,6 +599,259 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         await client.close();
     }
 });
+
+app.get('/compliance/loadbalancers/details', async (req, res) => {
+    const client = new MongoClient(uri);
+    const { team, tlsVersion, search = '', page = 1 } = req.query;
+    const pageSize = 25;
+    const currentPage = parseInt(page);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+
+        // Get the latest date from elb_v2 collection
+        const latestDoc = await db.collection("elb_v2").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in elb_v2 collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+
+        const allResources = [];
+
+        if (tlsVersion === "NO CERTS") {
+            // Find load balancers without TLS certificates
+            const elbV2Cursor = db.collection("elb_v2").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            // Get all ALB/NLB resource IDs with TLS
+            const tlsResourceIds = new Set();
+            const elbV2ListenersCursor = db.collection("elb_v2_listeners").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { projection: { resource_id: 1, Configuration: 1 } });
+            
+            for await (const doc of elbV2ListenersCursor) {
+                if (doc.Configuration?.Protocol === "HTTPS" || doc.Configuration?.Protocol === "TLS") {
+                    tlsResourceIds.add(doc.resource_id);
+                }
+            }
+            
+            // Find ALB/NLB without TLS
+            for await (const doc of elbV2Cursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                if (!tlsResourceIds.has(doc.resource_id)) {
+                    allResources.push({
+                        resourceId: doc.resource_id,
+                        shortName: doc.Configuration?.LoadBalancerName || doc.resource_id,
+                        type: doc.Configuration?.Type || "Unknown",
+                        scheme: doc.Configuration?.Scheme || "Unknown",
+                        accountId: doc.account_id,
+                        tlsPolicy: "NO CERTS",
+                        details: {
+                            dnsName: doc.Configuration?.DNSName,
+                            availabilityZones: doc.Configuration?.AvailabilityZones?.map(az => az.ZoneName).join(", "),
+                            securityGroups: doc.Configuration?.SecurityGroups?.join(", "),
+                            vpcId: doc.Configuration?.VpcId,
+                            state: doc.Configuration?.State?.Code
+                        }
+                    });
+                }
+            }
+            
+            // Find Classic ELB without TLS
+            const elbClassicCursor = db.collection("elb_classic").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            for await (const doc of elbClassicCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                let hasTLS = false;
+                if (doc.Configuration?.ListenerDescriptions) {
+                    for (const listenerDesc of doc.Configuration.ListenerDescriptions) {
+                        const listener = listenerDesc.Listener;
+                        if (listener?.Protocol === "HTTPS" || listener?.Protocol === "SSL") {
+                            hasTLS = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!hasTLS) {
+                    allResources.push({
+                        resourceId: doc.resource_id,
+                        shortName: doc.Configuration?.LoadBalancerName || doc.resource_id,
+                        type: "classic",
+                        scheme: doc.Configuration?.Scheme || "Unknown",
+                        accountId: doc.account_id,
+                        tlsPolicy: "NO CERTS",
+                        details: {
+                            dnsName: doc.Configuration?.DNSName,
+                            availabilityZones: doc.Configuration?.AvailabilityZones?.join(", "),
+                            securityGroups: doc.Configuration?.SecurityGroups?.join(", "),
+                            vpcId: doc.Configuration?.VPCId,
+                            state: "active"
+                        }
+                    });
+                }
+            }
+        } else {
+            // Find load balancers with specific TLS version
+            const elbV2ListenersCursor = db.collection("elb_v2_listeners").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            for await (const doc of elbV2ListenersCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                if (doc.Configuration) {
+                    const protocol = doc.Configuration.Protocol;
+                    if (protocol === "HTTPS" || protocol === "TLS") {
+                        const policy = doc.Configuration.SslPolicy || "Unknown";
+                        if (policy === tlsVersion) {
+                            // Get the load balancer details
+                            const lbDoc = await db.collection("elb_v2").findOne({
+                                year: latestYear,
+                                month: latestMonth, 
+                                day: latestDay,
+                                resource_id: doc.resource_id
+                            });
+                            
+                            if (lbDoc) {
+                                allResources.push({
+                                    resourceId: doc.resource_id,
+                                    shortName: lbDoc.Configuration?.LoadBalancerName || doc.resource_id,
+                                    type: lbDoc.Configuration?.Type || "Unknown",
+                                    scheme: lbDoc.Configuration?.Scheme || "Unknown",
+                                    accountId: doc.account_id,
+                                    tlsPolicy: policy,
+                                    details: {
+                                        dnsName: lbDoc.Configuration?.DNSName,
+                                        availabilityZones: lbDoc.Configuration?.AvailabilityZones?.map(az => az.ZoneName).join(", "),
+                                        securityGroups: lbDoc.Configuration?.SecurityGroups?.join(", "),
+                                        vpcId: lbDoc.Configuration?.VpcId,
+                                        state: lbDoc.Configuration?.State?.Code
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check Classic ELB with specific TLS version
+            const elbClassicCursor = db.collection("elb_classic").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            for await (const doc of elbClassicCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                if (doc.Configuration?.ListenerDescriptions) {
+                    for (const listenerDesc of doc.Configuration.ListenerDescriptions) {
+                        const listener = listenerDesc.Listener;
+                        if (listener?.Protocol === "HTTPS" || listener?.Protocol === "SSL") {
+                            const policy = listenerDesc.PolicyNames?.[0] || "Classic-Default";
+                            if (policy === tlsVersion) {
+                                allResources.push({
+                                    resourceId: doc.resource_id,
+                                    shortName: doc.Configuration?.LoadBalancerName || doc.resource_id,
+                                    type: "classic",
+                                    scheme: doc.Configuration?.Scheme || "Unknown",
+                                    accountId: doc.account_id,
+                                    tlsPolicy: policy,
+                                    details: {
+                                        dnsName: doc.Configuration?.DNSName,
+                                        availabilityZones: doc.Configuration?.AvailabilityZones?.join(", "),
+                                        securityGroups: doc.Configuration?.SecurityGroups?.join(", "),
+                                        vpcId: doc.Configuration?.VPCId,
+                                        state: "active"
+                                    }
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply search filter
+        const filteredResources = search ? 
+            allResources.filter(r => 
+                r.resourceId.toLowerCase().includes(search.toLowerCase()) ||
+                r.shortName.toLowerCase().includes(search.toLowerCase()) ||
+                r.accountId.includes(search)
+            ) : allResources;
+
+        // Sort by short name
+        filteredResources.sort((a, b) => a.shortName.localeCompare(b.shortName));
+
+        // Pagination
+        const totalResults = filteredResources.length;
+        const totalPages = Math.ceil(totalResults / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedResources = filteredResources.slice(startIndex, endIndex);
+
+        res.render('policies/loadbalancers/details.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, 
+                { text: "Load Balancers", href: "/compliance/loadbalancers" },
+                { text: `${team} - ${tlsVersion}`, href: "#" }
+            ],
+            policy_title: `Load Balancers with ${tlsVersion} - ${team} Team`,
+            team,
+            tlsVersion,
+            resources: paginatedResources,
+            search,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalResults,
+                pageSize,
+                hasNext: currentPage < totalPages,
+                hasPrev: currentPage > 1,
+                startResult: startIndex + 1,
+                endResult: Math.min(endIndex, totalResults)
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
 // Load Balancer Types Count
 app.get('/compliance/loadbalancers/types', async (req, res) => {
     const client = new MongoClient(uri);
