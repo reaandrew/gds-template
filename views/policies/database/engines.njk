@@ -1,9 +1,7 @@
 {% extends "policies/policy.njk" %}
-
 {% block policy_content %}
 <h1 class="govuk-heading-l">{{ policy_title }}</h1>
 <p class="govuk-body">This page shows database engines and versions grouped by team.</p>
-
 {% if data %}
     {% for teamData in data %}
         <h2 class="govuk-heading-m">{{ teamData.team }}</h2>

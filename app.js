@@ -32,7 +32,6 @@ const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN
  
 const mappings = yaml.parse(fs.readFileSync(path.join(__dirname, 'config/account_mappings.yaml'), 'utf8'));
 const accountIdToTeam = Object.fromEntries(mappings.map(mapping => [mapping.OwnerId, mapping.Team]));
-
 // Load and parse the YAML file
  
 // Configure Nunjucks
@@ -221,10 +220,8 @@ app.get('/compliance/tagging/services', (req, res) => {
 app.get('/compliance/loadbalancers', (req, res) => {
     res.redirect('/compliance/loadbalancers/tls');
 });
-
 app.get('/compliance/loadbalancers/tls', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -276,7 +273,6 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
             team,
             tlsVersions: [...rec.tlsVersions.entries()].map(([version, count]) => ({ version, count }))
         })).filter(t => t.tlsVersions.length > 0);
-
         res.render('policies/loadbalancers/tls.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
             policy_title: "Load Balancer TLS Configurations",
@@ -293,11 +289,9 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         await client.close();
     }
 });
-
 // Load Balancer Types Count
 app.get('/compliance/loadbalancers/types', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -347,7 +341,6 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
                 count 
             }))
         })).filter(t => t.types.length > 0);
-
         res.render('policies/loadbalancers/types.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
             policy_title: "Load Balancer Types by Team",
@@ -364,11 +357,9 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         await client.close();
     }
 });
-
 // Database Engines and Versions
 app.get('/compliance/database', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -421,7 +412,6 @@ app.get('/compliance/database', async (req, res) => {
                 return { engine, version: versionParts.join("-"), count };
             })
         })).filter(t => t.engines.length > 0);
-
         res.render('policies/database/engines.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Database", href: "/compliance/database" }],
             policy_title: "Database Engines and Versions",
@@ -434,11 +424,9 @@ app.get('/compliance/database', async (req, res) => {
         await client.close();
     }
 });
-
 // KMS Key Ages
 app.get('/compliance/kms', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -483,7 +471,6 @@ app.get('/compliance/kms', async (req, res) => {
                 .filter(bucket => rec.ageBuckets.has(bucket))
                 .map(bucket => ({ bucket, count: rec.ageBuckets.get(bucket) }))
         })).filter(t => t.ageBuckets.length > 0);
-
         res.render('policies/kms/ages.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "KMS Keys", href: "/compliance/kms" }],
             policy_title: "KMS Key Ages",
@@ -496,16 +483,13 @@ app.get('/compliance/kms', async (req, res) => {
         await client.close();
     }
 });
-
 // ASG Overview routes
 app.get('/compliance/autoscaling', (req, res) => {
     res.redirect('/compliance/autoscaling/dimensions');
 });
-
 // ASG Dimensions (counts by min/max/desired)
 app.get('/compliance/autoscaling/dimensions', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -542,7 +526,6 @@ app.get('/compliance/autoscaling/dimensions', async (req, res) => {
                 return { min: parseInt(min), max: parseInt(max), desired: parseInt(desired), count };
             }).sort((a, b) => b.count - a.count)
         })).filter(t => t.dimensions.length > 0);
-
         res.render('policies/autoscaling/dimensions.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Auto Scaling", href: "/compliance/autoscaling" }],
             policy_title: "Auto Scaling Group Dimensions",
@@ -559,11 +542,9 @@ app.get('/compliance/autoscaling/dimensions', async (req, res) => {
         await client.close();
     }
 });
-
 // ASGs with no instances
 app.get('/compliance/autoscaling/empty', async (req, res) => {
     const client = new MongoClient(uri);
-
     try {
         await client.connect();
         const db = client.db(dbName);
@@ -584,7 +565,6 @@ app.get('/compliance/autoscaling/empty', async (req, res) => {
         const data = [...teamCounts.entries()]
             .map(([team, count]) => ({ team, count }))
             .sort((a, b) => b.count - a.count);
-
         res.render('policies/autoscaling/empty.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Auto Scaling", href: "/compliance/autoscaling" }],
             policy_title: "Auto Scaling Groups with No Instances",
@@ -601,7 +581,6 @@ app.get('/compliance/autoscaling/empty', async (req, res) => {
         await client.close();
     }
 });
-
 app.listen(3000, () => {
     console.log('Server is running on http://localhost:3000');
 });
