@@ -3,24 +3,12 @@
 <h1 class="govuk-heading-l">{{ policy_title }}</h1>
 <p class="govuk-body">This page shows TLS/SSL configurations for load balancers grouped by team.</p>
 {% if data %}
-    <div class="govuk-grid-row">
-        <div class="govuk-grid-column-one-quarter">
-            <nav class="govuk-contents-list" aria-labelledby="contents">
-                <h2 class="govuk-contents-list__title" id="contents">
-                    Teams on this page
-                </h2>
-                <ol class="govuk-contents-list__list">
-                    {% for teamData in data %}
-                        <li class="govuk-contents-list__list-item">
-                            <a class="govuk-contents-list__link" href="#team-{{ loop.index }}">
-                                {{ teamData.team }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ol>
-            </nav>
-        </div>
-        <div class="govuk-grid-column-three-quarters">
+    <p class="govuk-body">
+        <strong>Jump to team:</strong>
+        {% for teamData in data %}
+            <a class="govuk-link" href="#team-{{ loop.index }}">{{ teamData.team }}</a>{% if not loop.last %} | {% endif %}
+        {% endfor %}
+    </p>
     {% for teamData in data %}
         <h2 class="govuk-heading-m" id="team-{{ loop.index }}">{{ teamData.team }}</h2>
         <table class="govuk-table">
@@ -46,8 +34,6 @@
             </tbody>
         </table>
     {% endfor %}
-        </div>
-    </div>
 {% else %}
     <p class="govuk-body">No load balancers with TLS/SSL configurations found.</p>
 {% endif %}
