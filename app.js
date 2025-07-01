@@ -248,14 +248,9 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             
-            if (doc.Configuration?.Listeners) {
-                for (const listener of doc.Configuration.Listeners) {
-                    if (listener.Protocol === "HTTPS" || listener.Protocol === "TLS") {
-                        const policy = listener.SslPolicy || "Unknown";
-                        rec.tlsVersions.set(policy, (rec.tlsVersions.get(policy) || 0) + 1);
-                    }
-                }
-            }
+            // Note: Schema shows ELB v2 doesn't include Listeners in Configuration
+            // TLS data may need to be queried separately from a listeners collection
+            console.log(`Debug TLS: ELB v2 doc has Configuration keys: ${Object.keys(doc.Configuration || {}).join(', ')}`);
         }
         
         // Process Classic ELB listeners
@@ -311,6 +306,8 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         const elbClassicCol = db.collection("elb_classic");
         
         const teamTypes = new Map(); // team → { types: Map<type, count> }
+        let totalV2Count = 0;
+        let totalClassicCount = 0;
         
         const ensureTeam = t => {
             if (!teamTypes.has(t))
@@ -322,6 +319,7 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of elbV2Cursor) {
+            totalV2Count++;
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             const type = doc.Configuration?.Type || "Unknown";
@@ -332,10 +330,14 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         const elbClassicCursor = elbClassicCol.find({}, { projection: { account_id: 1 } });
         
         for await (const doc of elbClassicCursor) {
+            totalClassicCount++;
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             rec.types.set("classic", (rec.types.get("classic") || 0) + 1);
         }
+        
+        console.log(`Debug: Total ELB v2: ${totalV2Count}, Total Classic: ${totalClassicCount}`);
+        console.log(`Debug: Teams found: ${[...teamTypes.keys()].join(', ')}`);
         
         // Format data
         const data = [...teamTypes.entries()].map(([team, rec]) => ({
@@ -344,7 +346,7 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
                 type: type === "application" ? "ALB" : type === "network" ? "NLB" : type === "classic" ? "Classic" : type,
                 count 
             }))
-        }));
+        })).filter(t => t.types.length > 0);
 
         res.render('policies/loadbalancers/types.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Load Balancers", href: "/compliance/loadbalancers" }],
@@ -468,10 +470,9 @@ app.get('/compliance/kms', async (req, res) => {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             
-            if (doc.Configuration?.CreationDate) {
-                const bucket = getAgeBucket(doc.Configuration.CreationDate);
-                rec.ageBuckets.set(bucket, (rec.ageBuckets.get(bucket) || 0) + 1);
-            }
+            // Note: KMS schema doesn't include CreationDate, so we'll bucket as "Unknown"
+            const bucket = "Unknown";
+            rec.ageBuckets.set(bucket, (rec.ageBuckets.get(bucket) || 0) + 1);
         }
         
         // Format data with ordered buckets
