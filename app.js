@@ -147,11 +147,28 @@ app.get('/compliance/tagging/teams', async (req, res) => {
  
     try {
         await client.connect();
-        const col = client.db(dbName).collection("tags");
- 
-        const cursor = col
-            .find({}, { projection: { day: 1, account_id: 1, resource_id: 1, resource_type: 1, Tags: 1 } })
-            .sort({ day: -1 });
+        const db = client.db(dbName);
+
+        // Get the latest date from tags collection
+        const latestDoc = await db.collection("tags").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in tags collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+
+        // Check tags collection for latest date only
+        const cursor = db.collection("tags").find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { 
+            projection: { day: 1, account_id: 1, resource_id: 1, resource_type: 1, Tags: 1 } 
+        });
  
         const mandLower = mandatoryTags.map(t => t.toLowerCase());
         const teamAgg = new Map();            // team → { resourceTypes: Map<resourceType, tagMissing: Map<tagName, count>>, _seen: Set }
@@ -271,14 +288,31 @@ app.get('/compliance/tagging/details', async (req, res) => {
         const db = client.db(dbName);
 
         const allResources = [];
+        const seenResources = new Set(); // Dedupe across data sources
 
         const isMissing = v =>
             v === null || v === undefined || (typeof v === "string" && v.trim() === "");
 
         const bucketStartsWithAccountId = arn => /^\d{12}/.test((arn.split(":::")[1] || ""));
 
-        // Check tags collection
-        const tagsCursor = db.collection("tags").find({}, { 
+        // Get the latest date from tags collection
+        const latestDoc = await db.collection("tags").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in tags collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+
+        // Check tags collection for latest date only
+        const tagsCursor = db.collection("tags").find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { 
             projection: { account_id: 1, resource_id: 1, resource_type: 1, Tags: 1 } 
         });
         
@@ -288,6 +322,10 @@ app.get('/compliance/tagging/details', async (req, res) => {
             
             const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
             if (docTeam !== team) continue;
+
+            // Skip if we've already seen this resource
+            if (seenResources.has(doc.resource_id)) continue;
+            seenResources.add(doc.resource_id);
 
             const tags = {};
             if (doc.Tags && Array.isArray(doc.Tags)) {
@@ -419,6 +457,18 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         await client.connect();
         const db = client.db(dbName);
         
+        // Get the latest date from elb_v2 collection
+        const latestDoc = await db.collection("elb_v2").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in elb_v2 collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         // Query all load balancer collections
         const elbV2Col = db.collection("elb_v2");
         const elbV2ListenersCol = db.collection("elb_v2_listeners");
@@ -433,14 +483,22 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         };
         
         // First, count ALL load balancers by team
-        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1 } });
+        const elbV2Cursor = elbV2Col.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1 } });
         for await (const doc of elbV2Cursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             rec.totalLBs++;
         }
         
-        const elbClassicTotalCursor = elbClassicCol.find({}, { projection: { account_id: 1 } });
+        const elbClassicTotalCursor = elbClassicCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1 } });
         for await (const doc of elbClassicTotalCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
@@ -448,7 +506,11 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         }
         
         // Then, count load balancers WITH TLS certificates
-        const elbV2ListenersCursor = elbV2ListenersCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const elbV2ListenersCursor = elbV2ListenersCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of elbV2ListenersCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -464,7 +526,11 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         }
         
         // Process Classic ELB listeners
-        const elbClassicCursor = elbClassicCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const elbClassicCursor = elbClassicCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of elbClassicCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -540,6 +606,18 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         await client.connect();
         const db = client.db(dbName);
         
+        // Get the latest date from elb_v2 collection
+        const latestDoc = await db.collection("elb_v2").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in elb_v2 collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         const elbV2Col = db.collection("elb_v2");
         const elbClassicCol = db.collection("elb_classic");
         
@@ -554,7 +632,11 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         };
         
         // Count ALB/NLB from elb_v2
-        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const elbV2Cursor = elbV2Col.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of elbV2Cursor) {
             totalV2Count++;
@@ -565,7 +647,11 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         }
         
         // Count Classic ELBs
-        const elbClassicCursor = elbClassicCol.find({}, { projection: { account_id: 1 } });
+        const elbClassicCursor = elbClassicCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1 } });
         
         for await (const doc of elbClassicCursor) {
             totalClassicCount++;
@@ -608,6 +694,18 @@ app.get('/compliance/database', async (req, res) => {
         await client.connect();
         const db = client.db(dbName);
         
+        // Get the latest date from rds collection
+        const latestDoc = await db.collection("rds").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in rds collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         const rdsCol = db.collection("rds");
         const redshiftCol = db.collection("redshift_clusters");
         
@@ -620,7 +718,11 @@ app.get('/compliance/database', async (req, res) => {
         };
         
         // Process RDS instances
-        const rdsCursor = rdsCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const rdsCursor = rdsCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of rdsCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -635,7 +737,11 @@ app.get('/compliance/database', async (req, res) => {
         }
         
         // Process Redshift clusters
-        const redshiftCursor = redshiftCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const redshiftCursor = redshiftCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of redshiftCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -674,6 +780,19 @@ app.get('/compliance/kms', async (req, res) => {
     try {
         await client.connect();
         const db = client.db(dbName);
+        
+        // Get the latest date from kms_key_metadata collection
+        const latestDoc = await db.collection("kms_key_metadata").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in kms_key_metadata collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         const kmsCol = db.collection("kms_key_metadata");
         
         const teamKeyAges = new Map(); // team → { ageBuckets: Map<bucket, count> }
@@ -696,7 +815,11 @@ app.get('/compliance/kms', async (req, res) => {
             return "2+ years";
         };
         
-        const kmsCursor = kmsCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const kmsCursor = kmsCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of kmsCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -738,6 +861,19 @@ app.get('/compliance/autoscaling/dimensions', async (req, res) => {
     try {
         await client.connect();
         const db = client.db(dbName);
+        
+        // Get the latest date from autoscaling_groups collection
+        const latestDoc = await db.collection("autoscaling_groups").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in autoscaling_groups collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         const asgCol = db.collection("autoscaling_groups");
         
         const teamDimensions = new Map(); // team → { dimensions: Map<dimension-key, count> }
@@ -748,7 +884,11 @@ app.get('/compliance/autoscaling/dimensions', async (req, res) => {
             return teamDimensions.get(t);
         };
         
-        const asgCursor = asgCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        const asgCursor = asgCol.find({
+            year: latestYear,
+            month: latestMonth, 
+            day: latestDay
+        }, { projection: { account_id: 1, Configuration: 1 } });
         
         for await (const doc of asgCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
@@ -793,12 +933,30 @@ app.get('/compliance/autoscaling/empty', async (req, res) => {
     try {
         await client.connect();
         const db = client.db(dbName);
+        
+        // Get the latest date from autoscaling_groups collection
+        const latestDoc = await db.collection("autoscaling_groups").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in autoscaling_groups collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+        
         const asgCol = db.collection("autoscaling_groups");
         
         const teamCounts = new Map(); // team → count
         
         const asgCursor = asgCol.find(
-            { "Configuration.Instances": { $size: 0 } },
+            { 
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay,
+                "Configuration.Instances": { $size: 0 } 
+            },
             { projection: { account_id: 1 } }
         );
         

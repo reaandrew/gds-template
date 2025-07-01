@@ -61,13 +61,22 @@
                                 <div class="govuk-!-margin-top-3">
                                     <strong>Current tags:</strong>
                                     {% if resource.tags and resource.tags | length > 0 %}
-                                        <div class="govuk-!-margin-top-1">
-                                            {% for key, value in resource.tags %}
-                                                <span class="govuk-tag govuk-tag--grey govuk-!-margin-right-1 govuk-!-margin-bottom-1">
-                                                    {{ key }}: {{ value }}
-                                                </span>
-                                            {% endfor %}
-                                        </div>
+                                        <table class="govuk-table govuk-!-margin-top-2">
+                                            <thead class="govuk-table__head">
+                                                <tr class="govuk-table__row">
+                                                    <th class="govuk-table__header govuk-!-font-size-14">Tag Key</th>
+                                                    <th class="govuk-table__header govuk-!-font-size-14">Tag Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="govuk-table__body">
+                                                {% for key, value in resource.tags %}
+                                                    <tr class="govuk-table__row">
+                                                        <td class="govuk-table__cell govuk-!-font-size-14"><strong>{{ key }}</strong></td>
+                                                        <td class="govuk-table__cell govuk-!-font-size-14">{{ value }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
                                     {% else %}
                                         <br><span class="govuk-hint">No tags found</span>
                                     {% endif %}
