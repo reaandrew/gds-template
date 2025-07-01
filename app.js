@@ -28,7 +28,7 @@ const policiesBreadcrumbs = [
 // Configuration for Markdown directory
 const markdownRoot = path.join(__dirname, 'markdown'); // Adjust the path as necessary
  
-const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN_Application"];
+const mandatoryTags = ["PRCode", "Source", "SN_ServiceID", "SN_Environment", "SN_Application", "Project", "Service", "BillingID"];
  
 const mappings = yaml.parse(fs.readFileSync(path.join(__dirname, 'config/account_mappings.yaml'), 'utf8'));
 const accountIdToTeam = Object.fromEntries(mappings.map(mapping => [mapping.OwnerId, mapping.Team]));
@@ -150,18 +150,25 @@ app.get('/compliance/tagging/teams', async (req, res) => {
         const col = client.db(dbName).collection("tags");
  
         const cursor = col
-            .find({}, { projection: { day: 1, account_id: 1, resource_id: 1, resource_type: 1, tags: 1 } })
+            .find({}, { projection: { day: 1, account_id: 1, resource_id: 1, resource_type: 1, Tags: 1 } })
             .sort({ day: -1 });
  
         const mandLower = mandatoryTags.map(t => t.toLowerCase());
-        const teamAgg = new Map();            // team → { tagMissing: Map<tagName, count>, _seen: Set }
+        const teamAgg = new Map();            // team → { resourceTypes: Map<resourceType, tagMissing: Map<tagName, count>>, _seen: Set }
         const ensureTeam = t => {
             if (!teamAgg.has(t)) {
-                const tagMissing = new Map();
-                mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
-                teamAgg.set(t, { tagMissing, _seen: new Set() });
+                teamAgg.set(t, { resourceTypes: new Map(), _seen: new Set() });
             }
             return teamAgg.get(t);
+        };
+        
+        const ensureResourceType = (teamRec, resourceType) => {
+            if (!teamRec.resourceTypes.has(resourceType)) {
+                const tagMissing = new Map();
+                mandatoryTags.forEach(tag => tagMissing.set(tag, 0));
+                teamRec.resourceTypes.set(resourceType, tagMissing);
+            }
+            return teamRec.resourceTypes.get(resourceType);
         };
  
         const isMissing = v =>
@@ -179,15 +186,21 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             if (rec._seen.has(doc.resource_id)) continue;
             rec._seen.add(doc.resource_id);
  
-            const tags = Object.fromEntries(
-                Object.entries(doc.tags || {}).map(([k, v]) => [k.toLowerCase(), v])
-            );
+            // Convert Tags array to object for easier lookup
+            const tags = {};
+            if (doc.Tags && Array.isArray(doc.Tags)) {
+                doc.Tags.forEach(tag => {
+                    if (tag.Key && tag.Value !== undefined) {
+                        tags[tag.Key.toLowerCase()] = tag.Value;
+                    }
+                });
+            }
             
             // Check each mandatory tag and increment missing count
             mandLower.forEach((tagLower, index) => {
                 if (isMissing(tags[tagLower])) {
                     const originalTagName = mandatoryTags[index];
-                    rec.tagMissing.set(originalTagName, rec.tagMissing.get(originalTagName) + 1);
+                    tagMissing.set(originalTagName, tagMissing.get(originalTagName) + 1);
                 }
             });
         }
