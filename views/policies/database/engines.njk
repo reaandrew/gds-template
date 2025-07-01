@@ -18,7 +18,9 @@
                     <tr class="govuk-table__row">
                         <td class="govuk-table__cell">{{ engine.engine }}</td>
                         <td class="govuk-table__cell">{{ engine.version }}</td>
-                        <td class="govuk-table__cell">{{ engine.count }}</td>
+                        <td class="govuk-table__cell">
+                            <a href="/compliance/database/details?team={{ teamData.team | urlencode }}&engine={{ engine.engine | urlencode }}&version={{ engine.version | urlencode }}" class="govuk-link">{{ engine.count }}</a>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>

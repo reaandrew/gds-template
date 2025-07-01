@@ -774,6 +774,136 @@ app.get('/compliance/database', async (req, res) => {
         await client.close();
     }
 });
+
+app.get('/compliance/database/details', async (req, res) => {
+    const client = new MongoClient(uri);
+    const { team, engine, version, search = '', page = 1 } = req.query;
+    const pageSize = 25;
+    const currentPage = parseInt(page);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+
+        // Get the latest date from rds collection
+        const latestDoc = await db.collection("rds").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in rds collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+
+        const allResources = [];
+
+        // Check RDS instances
+        if (engine !== "redshift") {
+            const rdsCursor = db.collection("rds").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, "Configuration.Engine": 1, "Configuration.EngineVersion": 1, "Configuration.DBInstanceIdentifier": 1 } 
+            });
+            
+            for await (const doc of rdsCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+
+                const docEngine = doc.Configuration?.Engine || "Unknown";
+                const docVersion = doc.Configuration?.EngineVersion || "Unknown";
+                
+                if (docEngine === engine && docVersion === version) {
+                    allResources.push({
+                        resourceId: doc.resource_id,
+                        shortName: doc.Configuration?.DBInstanceIdentifier || doc.resource_id,
+                        engine: docEngine,
+                        version: docVersion,
+                        accountId: doc.account_id
+                    });
+                }
+            }
+        }
+
+        // Check Redshift clusters
+        if (engine === "redshift") {
+            const redshiftCursor = db.collection("redshift_clusters").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, "Configuration.ClusterVersion": 1, "Configuration.ClusterIdentifier": 1 } 
+            });
+            
+            for await (const doc of redshiftCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+
+                const docVersion = doc.Configuration?.ClusterVersion || "Unknown";
+                
+                if (docVersion === version) {
+                    allResources.push({
+                        resourceId: doc.resource_id,
+                        shortName: doc.Configuration?.ClusterIdentifier || doc.resource_id,
+                        engine: "redshift",
+                        version: docVersion,
+                        accountId: doc.account_id
+                    });
+                }
+            }
+        }
+
+        // Apply search filter
+        const filteredResources = search ? 
+            allResources.filter(r => 
+                r.resourceId.toLowerCase().includes(search.toLowerCase()) ||
+                r.shortName.toLowerCase().includes(search.toLowerCase()) ||
+                r.accountId.includes(search)
+            ) : allResources;
+
+        // Sort by short name
+        filteredResources.sort((a, b) => a.shortName.localeCompare(b.shortName));
+
+        // Pagination
+        const totalResults = filteredResources.length;
+        const totalPages = Math.ceil(totalResults / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedResources = filteredResources.slice(startIndex, endIndex);
+
+        res.render('policies/database/details.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, 
+                { text: "Database", href: "/compliance/database" },
+                { text: `${team} - ${engine} ${version}`, href: "#" }
+            ],
+            policy_title: `${engine} ${version} Instances - ${team} Team`,
+            team,
+            engine,
+            version,
+            resources: paginatedResources,
+            search,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalResults,
+                pageSize,
+                hasNext: currentPage < totalPages,
+                hasPrev: currentPage > 1,
+                startResult: startIndex + 1,
+                endResult: Math.min(endIndex, totalResults)
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
 // KMS Key Ages
 app.get('/compliance/kms', async (req, res) => {
     const client = new MongoClient(uri);
