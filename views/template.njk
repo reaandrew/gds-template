@@ -2,9 +2,43 @@
  
 {% from "govuk/components/service-navigation/macro.njk" import govukServiceNavigation %}
 {% from "govuk/components/header/macro.njk" import govukHeader %}
+
+{# Set custom container width following GOV.UK Design System pattern #}
+{% set containerClasses = "app-width-container" %}
  
 {% block head %}
   <link rel="stylesheet" href="/stylesheets/govuk-frontend.min.css">
+  <style>
+    /* Custom width container following GOV.UK Design System guidance */
+    .app-width-container {
+      max-width: 1400px; /* Expanded from default 1020px for better data table viewing */
+      margin: 0 auto;
+      padding: 0 15px;
+    }
+    
+    /* Responsive padding for mobile devices */
+    @media (min-width: 40.0625em) {
+      .app-width-container {
+        padding: 0 30px;
+      }
+    }
+    
+    /* Optimize tables for wider layout */
+    .govuk-table {
+      font-size: 14px;
+    }
+    
+    /* Adjust grid proportions for data-heavy layouts */
+    @media (min-width: 40.0625em) {
+      .govuk-grid-column-two-thirds {
+        width: 75%;
+      }
+      
+      .govuk-grid-column-one-third {
+        width: 25%;
+      }
+    }
+  </style>
 {% endblock %}
  
 {% block header %}
