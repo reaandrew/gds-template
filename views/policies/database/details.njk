@@ -60,6 +60,18 @@
                                 <strong>Full resource ID:</strong><br>
                                 <code class="govuk-!-font-size-14">{{ resource.resourceId }}</code>
                                 
+                                {% if resource.deprecationWarnings and resource.deprecationWarnings.length > 0 %}
+                                <div class="govuk-warning-text govuk-!-margin-top-3">
+                                    <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+                                    <strong class="govuk-warning-text__text">
+                                        <span class="govuk-warning-text__assistive">Warning</span>
+                                        {% for warning in resource.deprecationWarnings %}
+                                            {{ warning }}{% if not loop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    </strong>
+                                </div>
+                                {% endif %}
+                                
                                 <div class="govuk-!-margin-top-3">
                                     <strong>Database details:</strong>
                                     <table class="govuk-table govuk-!-margin-top-2">

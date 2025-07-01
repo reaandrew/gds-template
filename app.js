@@ -775,6 +775,54 @@ app.get('/compliance/database', async (req, res) => {
     }
 });
 
+// Check for AWS deprecated database versions based on official AWS documentation
+function checkDatabaseDeprecation(engine, version) {
+    const issues = [];
+    
+    // MySQL deprecations
+    if (engine === 'mysql') {
+        if (version.startsWith('5.7')) {
+            issues.push('MySQL 5.7 reached end of standard support on February 29, 2024. Now on Extended Support (paid).');
+        }
+        if (version.includes('8.0.36') || version.includes('8.0.35') || version.includes('8.0.34') || 
+            version.includes('8.0.33') || version.includes('8.0.32')) {
+            issues.push('This MySQL 8.0 minor version will reach end of support on March 31, 2025.');
+        }
+    }
+    
+    // PostgreSQL deprecations  
+    if (engine === 'postgres') {
+        if (version.startsWith('11.')) {
+            issues.push('PostgreSQL 11 reached end of standard support on February 29, 2024.');
+        }
+        if (version.startsWith('12.')) {
+            issues.push('PostgreSQL 12 will reach end of standard support on February 28, 2025.');
+        }
+    }
+    
+    // Oracle deprecations
+    if (engine.startsWith('oracle')) {
+        if (version.includes('12.1') || version.includes('12.2')) {
+            issues.push('Oracle 12c is no longer supported. End of support was March 31, 2022.');
+        }
+        if (version.includes('11.2')) {
+            issues.push('Oracle 11g is no longer supported. Legacy version.');
+        }
+        if (version.includes('18.0')) {
+            issues.push('Oracle 18c is no longer supported. Legacy version.');
+        }
+    }
+    
+    // SQL Server deprecations
+    if (engine.startsWith('sqlserver')) {
+        if (version.includes('12.00')) {
+            issues.push('SQL Server 2014 reached end of support on July 9, 2024.');
+        }
+    }
+    
+    return issues;
+}
+
 app.get('/compliance/database/details', async (req, res) => {
     const client = new MongoClient(uri);
     const { team, engine, version, search = '', page = 1 } = req.query;
@@ -828,6 +876,7 @@ app.get('/compliance/database/details', async (req, res) => {
                             engine: docEngine,
                             version: docVersion,
                             accountId: doc.account_id,
+                            deprecationWarnings: checkDatabaseDeprecation(docEngine, docVersion),
                             details: {
                                 instanceClass: doc.Configuration.DBInstanceClass,
                                 status: doc.Configuration.DBInstanceStatus,
@@ -870,6 +919,7 @@ app.get('/compliance/database/details', async (req, res) => {
                             engine: "redshift",
                             version: docVersion,
                             accountId: doc.account_id,
+                            deprecationWarnings: checkDatabaseDeprecation("redshift", docVersion),
                             details: {
                                 nodeType: doc.Configuration.NodeType,
                                 status: doc.Configuration.ClusterStatus,
