@@ -41,9 +41,7 @@
             <tr class="govuk-table__row">
                 <th class="govuk-table__header">Resource Name</th>
                 <th class="govuk-table__header">Account</th>
-                <th class="govuk-table__header">Issue</th>
-                <th class="govuk-table__header">Relevant Tags</th>
-                <th class="govuk-table__header">Actions</th>
+                <th class="govuk-table__header" style="width: 40px;"></th>
             </tr>
         </thead>
         <tbody class="govuk-table__body">
@@ -59,32 +57,31 @@
                             <div class="govuk-details__text">
                                 <strong>Full resource ID:</strong><br>
                                 <code class="govuk-!-font-size-14">{{ resource.resourceId }}</code>
+                                
+                                <div class="govuk-!-margin-top-3">
+                                    <strong>Current tags:</strong>
+                                    {% if resource.tags and resource.tags | length > 0 %}
+                                        <div class="govuk-!-margin-top-1">
+                                            {% for key, value in resource.tags %}
+                                                <span class="govuk-tag govuk-tag--grey govuk-!-margin-right-1 govuk-!-margin-bottom-1">
+                                                    {{ key }}: {{ value }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <br><span class="govuk-hint">No tags found</span>
+                                    {% endif %}
+                                </div>
                             </div>
                         </details>
                     </td>
                     <td class="govuk-table__cell">{{ resource.accountId }}</td>
                     <td class="govuk-table__cell">
-                        <strong class="govuk-tag govuk-tag--red">{{ resource.missingReason }}</strong>
-                    </td>
-                    <td class="govuk-table__cell">
-                        {% if resource.relevantTags %}
-                            {% for key, value in resource.relevantTags %}
-                                <div class="govuk-!-margin-bottom-1">
-                                    <strong>{{ key }}:</strong> 
-                                    {% if value %}
-                                        <span class="govuk-tag govuk-tag--green">{{ value }}</span>
-                                    {% else %}
-                                        <span class="govuk-tag govuk-tag--red">Missing</span>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <span class="govuk-hint">No relevant tags</span>
-                        {% endif %}
-                    </td>
-                    <td class="govuk-table__cell">
-                        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" onclick="copyToClipboard('{{ resource.resourceId }}')">
-                            Copy ID
+                        <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" onclick="copyToClipboard('{{ resource.resourceId }}')" title="Copy resource ID" style="padding: 8px 12px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
                         </button>
                     </td>
                 </tr>
