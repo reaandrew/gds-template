@@ -1,0 +1,63 @@
+{% extends "policies/policy.njk" %}
+{% block policy_content %}
+<h1 class="govuk-heading-l">{{ policy_title }}</h1>
+<p class="govuk-body">
+    Showing <strong>{{ resources.length }}</strong> resources of type <strong>{{ resourceType }}</strong> 
+    in team <strong>{{ team }}</strong> that are missing the <strong>{{ tag }}</strong> tag{% if tag === "BSP" %} (requires BillingID AND either Service OR Project){% endif %}.
+</p>
+
+{% if resources.length > 0 %}
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th class="govuk-table__header">Resource ID</th>
+                <th class="govuk-table__header">Account ID</th>
+                <th class="govuk-table__header">Current Tags</th>
+                {% if tag === "BSP" %}
+                    <th class="govuk-table__header">Missing</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+            {% for resource in resources %}
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">
+                        <code class="govuk-!-font-size-14">{{ resource.resourceId }}</code>
+                    </td>
+                    <td class="govuk-table__cell">{{ resource.accountId }}</td>
+                    <td class="govuk-table__cell">
+                        {% if resource.tags %}
+                            {% for key, value in resource.tags %}
+                                <span class="govuk-tag govuk-tag--grey govuk-!-margin-right-1 govuk-!-margin-bottom-1">
+                                    {{ key }}: {{ value }}
+                                </span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="govuk-hint">No tags</span>
+                        {% endif %}
+                    </td>
+                    {% if tag === "BSP" %}
+                        <td class="govuk-table__cell">
+                            {% set hasBillingID = resource.tags.billingid %}
+                            {% set hasService = resource.tags.service %}
+                            {% set hasProject = resource.tags.project %}
+                            {% if not hasBillingID %}
+                                <span class="govuk-tag govuk-tag--red">BillingID</span>
+                            {% endif %}
+                            {% if hasBillingID and not hasService and not hasProject %}
+                                <span class="govuk-tag govuk-tag--red">Service OR Project</span>
+                            {% endif %}
+                        </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="govuk-body">No resources found matching the criteria.</p>
+{% endif %}
+
+<p class="govuk-body">
+    <a href="/compliance/tagging/teams" class="govuk-link">← Back to Teams Overview</a>
+</p>
+{% endblock %}
