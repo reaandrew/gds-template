@@ -2,33 +2,36 @@
 {% block policy_content %}
 <h1 class="govuk-heading-l">{{ policy_title }}</h1>
 
-<div class="govuk-grid-row">
-    <div class="govuk-grid-column-two-thirds">
-        <p class="govuk-body">
-            Resources of type <strong>{{ resourceType }}</strong> in team <strong>{{ team }}</strong> 
-            that are missing the <strong>{{ tag }}</strong> tag{% if tag === "BSP" %} (requires BillingID AND either Service OR Project){% endif %}.
-        </p>
-    </div>
-    <div class="govuk-grid-column-one-third">
-        <form method="get" class="govuk-form">
-            <div class="govuk-form-group">
-                <label class="govuk-label govuk-label--s" for="search">
-                    Search resources
-                </label>
+<p class="govuk-body">
+    Resources of type <strong>{{ resourceType }}</strong> in team <strong>{{ team }}</strong> 
+    that are missing the <strong>{{ tag }}</strong> tag{% if tag === "BSP" %} (requires BillingID AND either Service OR Project){% endif %}.
+</p>
+
+<form method="get" class="govuk-form">
+    <div class="govuk-form-group">
+        <label class="govuk-label govuk-label--s" for="search">
+            Search resources
+        </label>
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-three-quarters">
                 <input class="govuk-input" id="search" name="search" type="text" value="{{ search }}" placeholder="Resource name or account ID">
                 <input type="hidden" name="team" value="{{ team }}">
                 <input type="hidden" name="resourceType" value="{{ resourceType }}">
                 <input type="hidden" name="tag" value="{{ tag }}">
             </div>
-            <button class="govuk-button govuk-button--secondary" data-module="govuk-button">
-                Search
-            </button>
-            {% if search %}
-                <a href="?team={{ team | urlencode }}&resourceType={{ resourceType | urlencode }}&tag={{ tag | urlencode }}" class="govuk-link govuk-!-margin-left-2">Clear</a>
-            {% endif %}
-        </form>
+            <div class="govuk-grid-column-one-quarter">
+                <button class="govuk-button govuk-button--secondary govuk-!-width-full" data-module="govuk-button">
+                    Search
+                </button>
+            </div>
+        </div>
+        {% if search %}
+            <p class="govuk-body govuk-!-margin-top-2">
+                <a href="?team={{ team | urlencode }}&resourceType={{ resourceType | urlencode }}&tag={{ tag | urlencode }}" class="govuk-link">Clear search</a>
+            </p>
+        {% endif %}
     </div>
-</div>
+</form>
 
 {% if pagination.totalResults > 0 %}
     <p class="govuk-body">
