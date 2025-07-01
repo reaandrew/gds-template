@@ -183,11 +183,11 @@ app.get('/compliance/tagging/teams', async (req, res) => {
             const rec = ensureTeam(team);
  
             // global dedupe – if we’ve seen this resource already, skip it
-            if (teamRec._seen.has(doc.resource_id)) continue;
-            teamRec._seen.add(doc.resource_id);
+            if (rec._seen.has(doc.resource_id)) continue;
+            rec._seen.add(doc.resource_id);
 
             const resourceType = doc.resource_type || "unknown";
-            const tagMissing = ensureResourceType(teamRec, resourceType);
+            const tagMissing = ensureResourceType(rec, resourceType);
  
             // Convert Tags array to object for easier lookup
             const tags = {};
