@@ -259,6 +259,87 @@ app.get('/compliance/tagging/teams', async (req, res) => {
         await client.close();
     }
 });
+
+app.get('/compliance/tagging/details', async (req, res) => {
+    const client = new MongoClient(uri);
+    const { team, resourceType, tag } = req.query;
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+
+        const resources = [];
+
+        const isMissing = v =>
+            v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+
+        const bucketStartsWithAccountId = arn => /^\d{12}/.test((arn.split(":::")[1] || ""));
+
+        // Check tags collection
+        const tagsCursor = db.collection("tags").find({}, { 
+            projection: { account_id: 1, resource_id: 1, resource_type: 1, Tags: 1 } 
+        });
+        
+        for await (const doc of tagsCursor) {
+            if (doc.resource_type !== resourceType) continue;
+            if (doc.resource_type === "bucket" && bucketStartsWithAccountId(doc.resource_id)) continue;
+            
+            const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+            if (docTeam !== team) continue;
+
+            const tags = {};
+            if (doc.Tags && Array.isArray(doc.Tags)) {
+                doc.Tags.forEach(tagObj => {
+                    if (tagObj.Key && tagObj.Value !== undefined) {
+                        tags[tagObj.Key.toLowerCase()] = tagObj.Value;
+                    }
+                });
+            }
+
+            let isMissingTag = false;
+            
+            if (tag === "BSP") {
+                const hasBillingID = !isMissing(tags["billingid"]);
+                const hasService = !isMissing(tags["service"]);
+                const hasProject = !isMissing(tags["project"]);
+                isMissingTag = !(hasBillingID && (hasService || hasProject));
+            } else {
+                isMissingTag = isMissing(tags[tag.toLowerCase()]);
+            }
+
+            if (isMissingTag) {
+                resources.push({
+                    resourceId: doc.resource_id,
+                    resourceType: doc.resource_type,
+                    tags: tags,
+                    accountId: doc.account_id
+                });
+            }
+        }
+
+        res.render('policies/tagging/details.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, 
+                { text: "Tagging", href: "/compliance/tagging" },
+                { text: "Teams", href: "/compliance/tagging/teams" },
+                { text: `${team} - ${resourceType} - ${tag}`, href: "#" }
+            ],
+            policy_title: `Missing ${tag} Tags - ${team} Team`,
+            team,
+            resourceType,
+            tag,
+            resources,
+            menu_items: [
+                { href: "/compliance/tagging/teams", text: "Teams Overview" },
+                { href: "/compliance/tagging/services", text: "Services Overview" }
+            ]
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
  
 app.get('/compliance/tagging/services', (req, res) => {
     res.render('policies/tagging/services.njk', {
