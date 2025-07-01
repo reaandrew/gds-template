@@ -226,8 +226,8 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
         await client.connect();
         const db = client.db(dbName);
         
-        // Query both ELB collections
-        const elbV2Col = db.collection("elb_v2");
+        // Query listeners and classic ELB collections
+        const elbV2ListenersCol = db.collection("elb_v2_listeners");
         const elbClassicCol = db.collection("elb_classic");
         
         const teamTls = new Map(); // team → { tlsVersions: Map<version, count> }
@@ -238,16 +238,20 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
             return teamTls.get(t);
         };
         
-        // Process ALB/NLB listeners
-        const elbV2Cursor = elbV2Col.find({}, { projection: { account_id: 1, Configuration: 1 } });
+        // Process ALB/NLB listeners from dedicated collection
+        const elbV2ListenersCursor = elbV2ListenersCol.find({}, { projection: { account_id: 1, Configuration: 1 } });
         
-        for await (const doc of elbV2Cursor) {
+        for await (const doc of elbV2ListenersCursor) {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             
-            // Note: Schema shows ELB v2 doesn't include Listeners in Configuration
-            // TLS data may need to be queried separately from a listeners collection
-            console.log(`Debug TLS: ELB v2 doc has Configuration keys: ${Object.keys(doc.Configuration || {}).join(', ')}`);
+            if (doc.Configuration) {
+                const protocol = doc.Configuration.Protocol;
+                if (protocol === "HTTPS" || protocol === "TLS") {
+                    const policy = doc.Configuration.SslPolicy || "Unknown";
+                    rec.tlsVersions.set(policy, (rec.tlsVersions.get(policy) || 0) + 1);
+                }
+            }
         }
         
         // Process Classic ELB listeners
@@ -430,7 +434,7 @@ app.get('/compliance/kms', async (req, res) => {
     try {
         await client.connect();
         const db = client.db(dbName);
-        const kmsCol = db.collection("kms_keys");
+        const kmsCol = db.collection("kms_key_metadata");
         
         const teamKeyAges = new Map(); // team → { ageBuckets: Map<bucket, count> }
         
@@ -458,9 +462,10 @@ app.get('/compliance/kms', async (req, res) => {
             const team = accountIdToTeam[doc.account_id] || "Unknown";
             const rec = ensureTeam(team);
             
-            // Note: KMS schema doesn't include CreationDate, so we'll bucket as "Unknown"
-            const bucket = "Unknown";
-            rec.ageBuckets.set(bucket, (rec.ageBuckets.get(bucket) || 0) + 1);
+            if (doc.Configuration?.CreationDate) {
+                const bucket = getAgeBucket(doc.Configuration.CreationDate);
+                rec.ageBuckets.set(bucket, (rec.ageBuckets.get(bucket) || 0) + 1);
+            }
         }
         
         // Format data with ordered buckets
