@@ -643,23 +643,23 @@ app.get('/compliance/loadbalancers/details', async (req, res) => {
                 }
             }
             
-            // Get all resource IDs that have TLS
-            const tlsResourceIds = new Set();
+            // Get all load balancer ARNs that have TLS
+            const tlsLoadBalancerArns = new Set();
             const elbV2ListenersCursor = db.collection("elb_v2_listeners").find({
                 year: latestYear,
                 month: latestMonth, 
                 day: latestDay
-            }, { projection: { resource_id: 1, Configuration: 1 } });
+            }, { projection: { LoadBalancerArn: 1, Configuration: 1 } });
             
             for await (const doc of elbV2ListenersCursor) {
                 if (doc.Configuration?.Protocol === "HTTPS" || doc.Configuration?.Protocol === "TLS") {
-                    tlsResourceIds.add(doc.resource_id);
+                    tlsLoadBalancerArns.add(doc.LoadBalancerArn);
                 }
             }
             
             // Find team ALB/NLB without TLS
             for (const [resourceId, lbDoc] of teamLoadBalancers) {
-                if (!tlsResourceIds.has(resourceId)) {
+                if (!tlsLoadBalancerArns.has(resourceId)) {
                     allResources.push({
                         resourceId: resourceId,
                         shortName: lbDoc.Configuration?.LoadBalancerName || resourceId,
@@ -745,7 +745,7 @@ app.get('/compliance/loadbalancers/details', async (req, res) => {
                 month: latestMonth, 
                 day: latestDay
             }, { 
-                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+                projection: { account_id: 1, LoadBalancerArn: 1, Configuration: 1 } 
             });
             
             for await (const doc of elbV2ListenersCursor) {
@@ -753,11 +753,11 @@ app.get('/compliance/loadbalancers/details', async (req, res) => {
                     const protocol = doc.Configuration.Protocol;
                     if (protocol === "HTTPS" || protocol === "TLS") {
                         const policy = doc.Configuration.SslPolicy || "Unknown";
-                        if (policy === tlsVersion && teamLoadBalancers.has(doc.resource_id)) {
-                            const lbDoc = teamLoadBalancers.get(doc.resource_id);
+                        if (policy === tlsVersion && teamLoadBalancers.has(doc.LoadBalancerArn)) {
+                            const lbDoc = teamLoadBalancers.get(doc.LoadBalancerArn);
                             allResources.push({
-                                resourceId: doc.resource_id,
-                                shortName: lbDoc.Configuration?.LoadBalancerName || doc.resource_id,
+                                resourceId: doc.LoadBalancerArn,
+                                shortName: lbDoc.Configuration?.LoadBalancerName || doc.LoadBalancerArn,
                                 type: lbDoc.Configuration?.Type || "Unknown",
                                 scheme: lbDoc.Configuration?.Scheme || "Unknown",
                                 accountId: doc.account_id,
