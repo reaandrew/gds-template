@@ -106,16 +106,17 @@
 }) }}
 {{ govukServiceNavigation({
   serviceName: "Platform Policies and Standards",
-  serviceUrl: "#",
+  serviceUrl: "/",
   navigation: [
     {
-      href: "#",
+      href: "/compliance",
       text: "Compliance Reports",
-      active: true
+      active: currentSection === "compliance"
     },
     {
-      href: "#",
-      text: "Policies"
+      href: "/policies",
+      text: "Policies",
+      active: currentSection === "policies"
     }
   ]
 }) }}

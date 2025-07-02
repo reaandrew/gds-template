@@ -91,7 +91,8 @@ app.get('/compliance', (req, res) => {
  
     res.render('compliance.njk', {
         breadcrumbs: complianceBreadcrumbs,
-        navigationSections: navigationSections
+        navigationSections: navigationSections,
+        currentSection: "compliance"
     });
 });
  
@@ -148,7 +149,8 @@ app.get('/policies', (req, res) => {
     res.render('policy.njk', {
         breadcrumbs: policiesBreadcrumbs,
         policyContent: landingContent,
-        navigationSections: navigationSections
+        navigationSections: navigationSections,
+        currentSection: "policies"
     });
 });
  
@@ -199,7 +201,8 @@ app.get('/policies/:policy', (req, res) => {
             return res.status(404).render('policy.njk', {
                 breadcrumbs: [...policiesBreadcrumbs, { text: policy, href: `/policies/${policy}` }],
                 policyContent: errorContent,
-                navigationSections: navigationSections
+                navigationSections: navigationSections,
+                currentSection: "policies"
             });
         }
  
@@ -230,7 +233,8 @@ app.get('/policies/:policy', (req, res) => {
         res.render('policy.njk', {
             breadcrumbs: [...policiesBreadcrumbs, { text: policy, href: `/policies/${policy}` }],
             policyContent: htmlContent,
-            navigationSections: navigationSections
+            navigationSections: navigationSections,
+            currentSection: "policies"
         });
     });
 });
@@ -367,7 +371,8 @@ app.get('/compliance/tagging/teams', async (req, res) => {
                 { href: "/compliance/tagging/services", text: "Services Overview" }
             ],
             data,
-            mandatoryTags
+            mandatoryTags,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -526,7 +531,8 @@ app.get('/compliance/tagging/details', async (req, res) => {
             menu_items: [
                 { href: "/compliance/tagging/teams", text: "Teams Overview" },
                 { href: "/compliance/tagging/services", text: "Services Overview" }
-            ]
+            ],
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -543,7 +549,8 @@ app.get('/compliance/tagging/services', (req, res) => {
         menu_items: [
             { href: "/compliance/tagging/teams", text: "Teams Overview" },
             { href: "/compliance/tagging/services", text: "Services Overview" }
-        ]
+        ],
+        currentSection: "compliance"
     });
 });
  
@@ -690,7 +697,8 @@ app.get('/compliance/loadbalancers/tls', async (req, res) => {
                 { href: "/compliance/loadbalancers/tls", text: "TLS Configurations" },
                 { href: "/compliance/loadbalancers/types", text: "Load Balancer Types" }
             ],
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -954,7 +962,8 @@ app.get('/compliance/loadbalancers/details', async (req, res) => {
                 hasPrev: currentPage > 1,
                 startResult: startIndex + 1,
                 endResult: Math.min(endIndex, totalResults)
-            }
+            },
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1043,7 +1052,8 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
                 { href: "/compliance/loadbalancers/tls", text: "TLS Configurations" },
                 { href: "/compliance/loadbalancers/types", text: "Load Balancer Types" }
             ],
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1182,7 +1192,8 @@ app.get('/compliance/loadbalancers/types/details', async (req, res) => {
                 hasPrev: currentPage > 1,
                 startResult: startIndex + 1,
                 endResult: Math.min(endIndex, totalResults)
-            }
+            },
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1270,7 +1281,8 @@ app.get('/compliance/database', async (req, res) => {
         res.render('policies/database/engines.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "Database", href: "/compliance/database" }],
             policy_title: "Database Engines and Versions",
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1480,7 +1492,8 @@ app.get('/compliance/database/details', async (req, res) => {
                 hasPrev: currentPage > 1,
                 startResult: startIndex + 1,
                 endResult: Math.min(endIndex, totalResults)
-            }
+            },
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1558,7 +1571,8 @@ app.get('/compliance/kms', async (req, res) => {
         res.render('policies/kms/ages.njk', {
             breadcrumbs: [...complianceBreadcrumbs, { text: "KMS Keys", href: "/compliance/kms" }],
             policy_title: "KMS Key Ages",
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1634,7 +1648,8 @@ app.get('/compliance/autoscaling/dimensions', async (req, res) => {
                 { href: "/compliance/autoscaling/dimensions", text: "ASG Dimensions" },
                 { href: "/compliance/autoscaling/empty", text: "Empty ASGs" }
             ],
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1752,7 +1767,8 @@ app.get('/compliance/autoscaling/dimensions/details', async (req, res) => {
                 hasPrev: currentPage > 1,
                 startResult: startIndex + 1,
                 endResult: Math.min(endIndex, totalResults)
-            }
+            },
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
@@ -1810,7 +1826,8 @@ app.get('/compliance/autoscaling/empty', async (req, res) => {
                 { href: "/compliance/autoscaling/dimensions", text: "ASG Dimensions" },
                 { href: "/compliance/autoscaling/empty", text: "Empty ASGs" }
             ],
-            data
+            data,
+            currentSection: "compliance"
         });
     } catch (err) {
         console.error(err);
