@@ -952,6 +952,146 @@ app.get('/compliance/loadbalancers/types', async (req, res) => {
         await client.close();
     }
 });
+
+app.get('/compliance/loadbalancers/types/details', async (req, res) => {
+    const client = new MongoClient(uri);
+    const { team, type, search = '', page = 1 } = req.query;
+    const pageSize = 25;
+    const currentPage = parseInt(page);
+
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+
+        // Get the latest date from elb_v2 collection
+        const latestDoc = await db.collection("elb_v2").findOne({}, { 
+            projection: { year: 1, month: 1, day: 1 },
+            sort: { year: -1, month: -1, day: -1 } 
+        });
+        
+        if (!latestDoc) {
+            throw new Error("No data found in elb_v2 collection");
+        }
+        
+        const { year: latestYear, month: latestMonth, day: latestDay } = latestDoc;
+
+        const allResources = [];
+
+        if (type === "classic") {
+            // Get Classic load balancers
+            const elbClassicCursor = db.collection("elb_classic").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            for await (const doc of elbClassicCursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                allResources.push({
+                    resourceId: doc.resource_id,
+                    shortName: doc.Configuration?.LoadBalancerName || doc.resource_id,
+                    type: "classic",
+                    scheme: doc.Configuration?.Scheme || "Unknown",
+                    accountId: doc.account_id,
+                    details: {
+                        dnsName: doc.Configuration?.DNSName,
+                        availabilityZones: doc.Configuration?.AvailabilityZones?.join(", "),
+                        securityGroups: doc.Configuration?.SecurityGroups?.join(", "),
+                        vpcId: doc.Configuration?.VPCId,
+                        createdTime: doc.Configuration?.CreatedTime
+                    }
+                });
+            }
+        } else {
+            // Get ALB/NLB from elb_v2
+            const elbV2Cursor = db.collection("elb_v2").find({
+                year: latestYear,
+                month: latestMonth, 
+                day: latestDay
+            }, { 
+                projection: { account_id: 1, resource_id: 1, Configuration: 1 } 
+            });
+            
+            for await (const doc of elbV2Cursor) {
+                const docTeam = accountIdToTeam[doc.account_id] || "Unknown";
+                if (docTeam !== team) continue;
+                
+                const docType = doc.Configuration?.Type;
+                if (docType === type) {
+                    allResources.push({
+                        resourceId: doc.resource_id,
+                        shortName: doc.Configuration?.LoadBalancerName || doc.resource_id,
+                        type: docType === "application" ? "ALB" : docType === "network" ? "NLB" : docType,
+                        scheme: doc.Configuration?.Scheme || "Unknown",
+                        accountId: doc.account_id,
+                        details: {
+                            dnsName: doc.Configuration?.DNSName,
+                            availabilityZones: doc.Configuration?.AvailabilityZones?.map(az => az.ZoneName).join(", "),
+                            securityGroups: doc.Configuration?.SecurityGroups?.join(", "),
+                            vpcId: doc.Configuration?.VpcId,
+                            state: doc.Configuration?.State?.Code,
+                            createdTime: doc.Configuration?.CreatedTime
+                        }
+                    });
+                }
+            }
+        }
+
+        // Apply search filter
+        const filteredResources = search ? 
+            allResources.filter(r => 
+                r.resourceId.toLowerCase().includes(search.toLowerCase()) ||
+                r.shortName.toLowerCase().includes(search.toLowerCase()) ||
+                r.accountId.includes(search)
+            ) : allResources;
+
+        // Sort by short name
+        filteredResources.sort((a, b) => a.shortName.localeCompare(b.shortName));
+
+        // Pagination
+        const totalResults = filteredResources.length;
+        const totalPages = Math.ceil(totalResults / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedResources = filteredResources.slice(startIndex, endIndex);
+
+        const displayType = type === "application" ? "ALB" : type === "network" ? "NLB" : "Classic";
+
+        res.render('policies/loadbalancers/types/details.njk', {
+            breadcrumbs: [...complianceBreadcrumbs, 
+                { text: "Load Balancers", href: "/compliance/loadbalancers" },
+                { text: "Types", href: "/compliance/loadbalancers/types" },
+                { text: `${team} - ${displayType}`, href: "#" }
+            ],
+            policy_title: `${displayType} Load Balancers - ${team} Team`,
+            team,
+            type: displayType,
+            originalType: type,
+            resources: paginatedResources,
+            search,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalResults,
+                pageSize,
+                hasNext: currentPage < totalPages,
+                hasPrev: currentPage > 1,
+                startResult: startIndex + 1,
+                endResult: Math.min(endIndex, totalResults)
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+    } finally {
+        await client.close();
+    }
+});
+
 // Database Engines and Versions
 app.get('/compliance/database', async (req, res) => {
     const client = new MongoClient(uri);

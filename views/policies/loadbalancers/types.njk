@@ -25,11 +25,23 @@
                 {% endfor %}
                 <tr class="govuk-table__row"{% if classic > 0 %} style="background-color: #fef2f2;"{% endif %}>
                     <td class="govuk-table__cell">{{ teamData.team }}</td>
-                    <td class="govuk-table__cell">{{ alb }}</td>
-                    <td class="govuk-table__cell">{{ nlb }}</td>
+                    <td class="govuk-table__cell">
+                        {% if alb > 0 %}
+                            <a href="/compliance/loadbalancers/types/details?team={{ teamData.team | urlencode }}&type=application" class="govuk-link">{{ alb }}</a>
+                        {% else %}
+                            {{ alb }}
+                        {% endif %}
+                    </td>
+                    <td class="govuk-table__cell">
+                        {% if nlb > 0 %}
+                            <a href="/compliance/loadbalancers/types/details?team={{ teamData.team | urlencode }}&type=network" class="govuk-link">{{ nlb }}</a>
+                        {% else %}
+                            {{ nlb }}
+                        {% endif %}
+                    </td>
                     <td class="govuk-table__cell">
                         {% if classic > 0 %}
-                            {{ classic }} <span class="govuk-hint govuk-!-font-size-14" style="color: #d73027;">(deprecated)</span>
+                            <a href="/compliance/loadbalancers/types/details?team={{ teamData.team | urlencode }}&type=classic" class="govuk-link">{{ classic }}</a> <span class="govuk-hint govuk-!-font-size-14" style="color: #d73027;">(deprecated)</span>
                         {% else %}
                             {{ classic }}
                         {% endif %}
