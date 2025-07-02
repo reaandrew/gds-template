@@ -58,24 +58,13 @@
       position: relative;
     }
     
-    /* Remove default column padding for perfect alignment with header */
-    .app-split-pane__nav {
-      margin-left: -15px;
-    }
-    
-    @media (min-width: 40.0625em) {
-      .app-split-pane__nav {
-        margin-left: -30px;
-      }
-    }
-    
     .app-subnav .govuk-link {
       display: block;
       padding: 8px 0;
-      padding-left: 19px;
+      padding-left: 15px;
       text-decoration: none;
       border-left: 4px solid transparent;
-      margin-left: 0;
+      margin-left: -15px;
     }
     
     .app-subnav .govuk-link:hover {
@@ -105,11 +94,13 @@
     .govuk-header .govuk-width-container,
     .govuk-service-navigation__container,
     .govuk-service-navigation__wrapper,
-    .govuk-service-navigation .govuk-width-container {
+    .govuk-service-navigation .govuk-width-container,
+    .govuk-service-navigation__navigation {
       max-width: 1400px !important;
-      margin: 0 auto;
-      padding-left: 15px;
-      padding-right: 15px;
+      margin: 0 auto !important;
+      padding-left: 15px !important;
+      padding-right: 15px !important;
+      box-sizing: border-box !important;
     }
     
     /* Allow header backgrounds to be full width but constrain content */
@@ -144,9 +135,10 @@
       .govuk-service-navigation__container,
       .govuk-service-navigation__wrapper,
       .govuk-service-navigation .govuk-width-container,
+      .govuk-service-navigation__navigation,
       .govuk-width-container {
-        padding-left: 30px;
-        padding-right: 30px;
+        padding-left: 30px !important;
+        padding-right: 30px !important;
       }
       
       .govuk-header [class*="container"],
