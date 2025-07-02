@@ -102,11 +102,10 @@ app.get('/policies', (req, res) => {
         {
             title: "Policy Documents",
             items: [
-                { text: "Decommissioning", href: "/policies/decommissioning" },
-                { text: "Containers", href: "/policies/containers" },
-                { text: "Monitoring and Alerting", href: "/policies/monitoring" },
-                { text: "AMIs", href: "/policies/amis" },
-                { text: "Agents and Ports", href: "/policies/agents" }
+                { text: "Tagging", href: "/policies/tagging" },
+                { text: "Databases", href: "/policies/databases" },
+                { text: "Load Balancers", href: "/policies/load_balancers" },
+                { text: "Decommissioning", href: "/policies/decommissioning" }
             ]
         },
         {
@@ -128,11 +127,10 @@ app.get('/policies', (req, res) => {
         <h2 class="govuk-heading-m">Policy Documents</h2>
         <p class="govuk-body">Policy documents describe the standards and best practices for managing AWS resources.</p>
         <ul class="govuk-list govuk-list--bullet">
+            <li><a class="govuk-link" href="/policies/tagging">Tagging</a> - Resource tagging standards and requirements</li>
+            <li><a class="govuk-link" href="/policies/databases">Databases</a> - Database configuration and security policies</li>
+            <li><a class="govuk-link" href="/policies/load_balancers">Load Balancers</a> - Load balancer security and configuration standards</li>
             <li><a class="govuk-link" href="/policies/decommissioning">Decommissioning</a> - Guidelines for safely decommissioning resources</li>
-            <li><a class="govuk-link" href="/policies/containers">Containers</a> - Container security and management policies</li>
-            <li><a class="govuk-link" href="/policies/monitoring">Monitoring and Alerting</a> - Monitoring requirements and alert configuration</li>
-            <li><a class="govuk-link" href="/policies/amis">AMIs</a> - AMI creation and management standards</li>
-            <li><a class="govuk-link" href="/policies/agents">Agents and Ports</a> - Security agent and port management policies</li>
         </ul>
         
         <h2 class="govuk-heading-m">Compliance Reports</h2>
@@ -166,11 +164,10 @@ app.get('/policies/:policy', (req, res) => {
                 {
                     title: "Policy Documents",
                     items: [
-                        { text: "Decommissioning", href: "/policies/decommissioning" },
-                        { text: "Containers", href: "/policies/containers" },
-                        { text: "Monitoring and Alerting", href: "/policies/monitoring" },
-                        { text: "AMIs", href: "/policies/amis" },
-                        { text: "Agents and Ports", href: "/policies/agents" }
+                        { text: "Tagging", href: "/policies/tagging" },
+                        { text: "Databases", href: "/policies/databases" },
+                        { text: "Load Balancers", href: "/policies/load_balancers" },
+                        { text: "Decommissioning", href: "/policies/decommissioning" }
                     ]
                 },
                 {
@@ -211,11 +208,10 @@ app.get('/policies/:policy', (req, res) => {
             {
                 title: "Policy Documents",
                 items: [
-                    { text: "Decommissioning", href: "/policies/decommissioning" },
-                    { text: "Containers", href: "/policies/containers" },
-                    { text: "Monitoring and Alerting", href: "/policies/monitoring" },
-                    { text: "AMIs", href: "/policies/amis" },
-                    { text: "Agents and Ports", href: "/policies/agents" }
+                    { text: "Tagging", href: "/policies/tagging" },
+                    { text: "Databases", href: "/policies/databases" },
+                    { text: "Load Balancers", href: "/policies/load_balancers" },
+                    { text: "Decommissioning", href: "/policies/decommissioning" }
                 ]
             },
             {
