@@ -95,9 +95,61 @@ app.get('/compliance', (req, res) => {
     });
 });
  
-// Route for /policies to render first policy
+// Route for /policies to show policy documentation landing page
 app.get('/policies', (req, res) => {
-    res.redirect('/policies/tagging');
+    const navigationSections = [
+        {
+            title: "Policy Documents",
+            items: [
+                { text: "Decommissioning", href: "/policies/decommissioning" },
+                { text: "Containers", href: "/policies/containers" },
+                { text: "Monitoring and Alerting", href: "/policies/monitoring" },
+                { text: "AMIs", href: "/policies/amis" },
+                { text: "Agents and Ports", href: "/policies/agents" }
+            ]
+        },
+        {
+            title: "Compliance Reports",
+            items: [
+                { text: "Tagging", href: "/compliance/tagging" },
+                { text: "Load Balancers", href: "/compliance/loadbalancers" },
+                { text: "Database", href: "/compliance/database" },
+                { text: "KMS Keys", href: "/compliance/kms" },
+                { text: "Auto Scaling", href: "/compliance/autoscaling" }
+            ]
+        }
+    ];
+    
+    const landingContent = `
+        <h1 class="govuk-heading-l">AWS Policies</h1>
+        <p class="govuk-body-l">This section contains policy documentation and compliance reports for AWS resources.</p>
+        
+        <h2 class="govuk-heading-m">Policy Documents</h2>
+        <p class="govuk-body">Policy documents describe the standards and best practices for managing AWS resources.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><a class="govuk-link" href="/policies/decommissioning">Decommissioning</a> - Guidelines for safely decommissioning resources</li>
+            <li><a class="govuk-link" href="/policies/containers">Containers</a> - Container security and management policies</li>
+            <li><a class="govuk-link" href="/policies/monitoring">Monitoring and Alerting</a> - Monitoring requirements and alert configuration</li>
+            <li><a class="govuk-link" href="/policies/amis">AMIs</a> - AMI creation and management standards</li>
+            <li><a class="govuk-link" href="/policies/agents">Agents and Ports</a> - Security agent and port management policies</li>
+        </ul>
+        
+        <h2 class="govuk-heading-m">Compliance Reports</h2>
+        <p class="govuk-body">Compliance reports show the current compliance status of AWS resources against our policies.</p>
+        <ul class="govuk-list govuk-list--bullet">
+            <li><a class="govuk-link" href="/compliance/tagging">Tagging Compliance</a> - Resource tagging compliance by team</li>
+            <li><a class="govuk-link" href="/compliance/loadbalancers">Load Balancers</a> - TLS configurations and load balancer types</li>
+            <li><a class="govuk-link" href="/compliance/database">Database Engines</a> - Database versions and deprecation status</li>
+            <li><a class="govuk-link" href="/compliance/kms">KMS Keys</a> - KMS key age and rotation status</li>
+            <li><a class="govuk-link" href="/compliance/autoscaling">Auto Scaling</a> - ASG configurations and empty groups</li>
+        </ul>
+    `;
+    
+    res.render('policy.njk', {
+        breadcrumbs: policiesBreadcrumbs,
+        policyContent: landingContent,
+        navigationSections: navigationSections
+    });
 });
  
 // Markdown rendering route for policies
@@ -107,22 +159,70 @@ app.get('/policies/:policy', (req, res) => {
  
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
-            return res.status(404).send('File not found');
+            // Try to provide a helpful error message
+            const navigationSections = [
+                {
+                    title: "Policy Documents",
+                    items: [
+                        { text: "Decommissioning", href: "/policies/decommissioning" },
+                        { text: "Containers", href: "/policies/containers" },
+                        { text: "Monitoring and Alerting", href: "/policies/monitoring" },
+                        { text: "AMIs", href: "/policies/amis" },
+                        { text: "Agents and Ports", href: "/policies/agents" }
+                    ]
+                },
+                {
+                    title: "Compliance Reports",
+                    items: [
+                        { text: "Tagging", href: "/compliance/tagging" },
+                        { text: "Load Balancers", href: "/compliance/loadbalancers" },
+                        { text: "Database", href: "/compliance/database" },
+                        { text: "KMS Keys", href: "/compliance/kms" },
+                        { text: "Auto Scaling", href: "/compliance/autoscaling" }
+                    ]
+                }
+            ];
+            
+            const errorContent = `
+                <h1 class="govuk-heading-l">Policy document not found</h1>
+                <p class="govuk-body">The policy document <code>${policy}.md</code> was not found in the markdown directory.</p>
+                <p class="govuk-body">To create this policy document, add a file named <code>${policy}.md</code> to the <code>${markdownRoot}</code> directory.</p>
+                <div class="govuk-warning-text">
+                    <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+                    <strong class="govuk-warning-text__text">
+                        <span class="govuk-warning-text__assistive">Warning</span>
+                        If you were looking for a compliance report instead of a policy document, check the Compliance Reports section in the navigation.
+                    </strong>
+                </div>
+            `;
+            
+            return res.status(404).render('policy.njk', {
+                breadcrumbs: [...policiesBreadcrumbs, { text: policy, href: `/policies/${policy}` }],
+                policyContent: errorContent,
+                navigationSections: navigationSections
+            });
         }
  
         const htmlContent = marked(data); // Parse markdown to HTML
         const navigationSections = [
             {
-                title: "Policies",
+                title: "Policy Documents",
                 items: [
-                    { text: "Tagging", href: "/policies/tagging" },
-                    { text: "Load Balancers", href: "/policies/loadbalancers" },
-                    { text: "Database", href: "/policies/database" },
                     { text: "Decommissioning", href: "/policies/decommissioning" },
                     { text: "Containers", href: "/policies/containers" },
                     { text: "Monitoring and Alerting", href: "/policies/monitoring" },
                     { text: "AMIs", href: "/policies/amis" },
                     { text: "Agents and Ports", href: "/policies/agents" }
+                ]
+            },
+            {
+                title: "Compliance Reports",
+                items: [
+                    { text: "Tagging", href: "/compliance/tagging" },
+                    { text: "Load Balancers", href: "/compliance/loadbalancers" },
+                    { text: "Database", href: "/compliance/database" },
+                    { text: "KMS Keys", href: "/compliance/kms" },
+                    { text: "Auto Scaling", href: "/compliance/autoscaling" }
                 ]
             }
         ];
