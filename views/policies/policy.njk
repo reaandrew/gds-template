@@ -18,7 +18,7 @@
               <ul class="govuk-list  govuk-list--spaced">
                 {% for menu_item in menu_items %}
                     <li>
-                      <a class="govuk-link" href="{{ menu_item.href }}">{{ menu_item.text  }}</a>
+                      <a class="govuk-link{% if menu_item.href == currentPath %} app-subnav__link--current{% endif %}" href="{{ menu_item.href }}">{{ menu_item.text  }}</a>
                     </li>
                 {% endfor %}
               </ul>

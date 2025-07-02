@@ -17,7 +17,7 @@
                 <ul class="govuk-list govuk-list--spaced">
                   {% for item in section.items %}
                     <li>
-                      <a class="govuk-link" href="{{ item.href }}">{{ item.text }}</a>
+                      <a class="govuk-link{% if item.href == currentPath %} app-subnav__link--current{% endif %}" href="{{ item.href }}">{{ item.text }}</a>
                     </li>
                   {% endfor %}
                 </ul>

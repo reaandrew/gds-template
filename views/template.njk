@@ -39,6 +39,58 @@
       }
     }
     
+    /* Left-hand navigation active states following GDS patterns */
+    .app-subnav {
+      border-top: 1px solid #b1b4b6;
+      margin-top: 20px;
+      padding-top: 20px;
+    }
+    
+    .app-subnav__theme {
+      margin-bottom: 15px;
+      margin-top: 30px;
+    }
+    
+    .app-subnav__theme:first-child {
+      margin-top: 0;
+    }
+    
+    .app-subnav .govuk-list li {
+      margin-bottom: 8px;
+      position: relative;
+    }
+    
+    .app-subnav .govuk-link {
+      display: block;
+      padding: 8px 0;
+      padding-left: 15px;
+      text-decoration: none;
+      border-left: 4px solid transparent;
+      margin-left: -15px;
+    }
+    
+    .app-subnav .govuk-link:hover {
+      background-color: #f3f2f1;
+      border-left-color: #505a5f;
+    }
+    
+    .app-subnav .govuk-link.app-subnav__link--current {
+      background-color: #1d70b8;
+      border-left-color: #1d70b8;
+      color: #ffffff;
+      font-weight: bold;
+    }
+    
+    .app-subnav .govuk-link.app-subnav__link--current:hover {
+      background-color: #003078;
+      border-left-color: #003078;
+      color: #ffffff;
+    }
+    
+    .app-subnav .govuk-link.app-subnav__link--current:visited {
+      color: #ffffff;
+    }
+    
     /* Align header and navigation with custom container width */
     .govuk-header__container,
     .govuk-header .govuk-width-container,
